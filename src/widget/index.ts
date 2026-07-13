@@ -92,7 +92,7 @@ interface WidgetConfig {
   // Welcome screen behavior
   welcome: 'once' | 'always' | 'never';
   // Screenshot configuration
-  screenshotMode: 'optional' | 'auto' | 'required';
+  screenshotMode: 'never' | 'optional' | 'auto' | 'required';
   screenshotScale?: number; // Minimum pixel ratio for captures (default: 2)
   elementContextMaxArea?: number; // Max ancestor capture area as a viewport multiplier
   issueLinkVisibility: IssueLinkVisibility;
@@ -485,10 +485,10 @@ const config: WidgetConfig = {
   // Screenshot configuration
   screenshotMode: (() => {
     const val = script?.dataset.screenshot;
-    if (val === 'auto' || val === 'required') return val;
+    if (val === 'never' || val === 'auto' || val === 'required') return val;
     if (val && val !== 'optional') {
       console.warn(
-        `[BugDrop] Invalid data-screenshot "${val}". Expected "optional", "auto", or "required".`
+        `[BugDrop] Invalid data-screenshot "${val}". Expected "never", "optional", "auto", or "required".`
       );
     }
     return 'optional' as const;
@@ -819,12 +819,21 @@ function initWidget(config: WidgetConfig) {
   const shadow = host.attachShadow({ mode: 'open' });
   installRadixDialogCompatibility(host);
 
-  // Prevent keyboard events from leaking to host page (e.g., ERPNext console shortcuts)
+  // Prevent keyboard events from leaking to host page (e.g., ERPNext console shortcuts).
+  // stopImmediatePropagation also protects text entry from later listeners attached to the
+  // widget root that call preventDefault for application shortcuts.
   for (const eventType of ['keydown', 'keypress', 'keyup'] as const) {
     shadow.addEventListener(eventType, (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        e.stopPropagation();
+      const isTextEntry = e
+        .composedPath()
+        .some(
+          target =>
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            (target instanceof HTMLElement && target.isContentEditable)
+        );
+      if (isTextEntry) {
+        e.stopImmediatePropagation();
       }
     });
   }
@@ -1332,7 +1341,7 @@ function showFeedbackFormWithScreenshotOption(
           </div>
           <div class="bd-actions">
             <button type="button" class="bd-btn bd-btn-secondary" data-action="cancel">${escapeWidgetText(t().cancel)}</button>
-            <button type="submit" class="bd-btn bd-btn-primary" id="submit-btn">${config.screenshotMode === 'auto' ? escapeWidgetText(t().submit) : escapeWidgetText(t().continueButton)}</button>
+            <button type="submit" class="bd-btn bd-btn-primary" id="submit-btn">${config.screenshotMode === 'auto' || config.screenshotMode === 'never' ? escapeWidgetText(t().submit) : escapeWidgetText(t().continueButton)}</button>
           </div>
         </form>
       `
@@ -1397,7 +1406,11 @@ function showFeedbackFormWithScreenshotOption(
       ) as HTMLInputElement;
       const category = (categoryInput?.value || 'bug') as FeedbackCategory;
       const includeScreenshot =
-        config.screenshotMode === 'optional' ? (screenshotCheckbox?.checked ?? false) : true;
+        config.screenshotMode === 'never'
+          ? false
+          : config.screenshotMode === 'optional'
+            ? (screenshotCheckbox?.checked ?? false)
+            : true;
       if (config.screenshotMode === 'optional' && includeScreenshot) {
         clearComplexScreenshotsSkipped(config.repo);
       }
@@ -1550,6 +1563,10 @@ function getScreenshotFormControl(
   config: WidgetConfig,
   initialValues?: FeedbackFormResult | null
 ): string {
+  if (config.screenshotMode === 'never') {
+    return '';
+  }
+
   if (config.screenshotMode === 'auto') {
     const redactionNote =
       getRedactionCount() > 0 ? ` ${escapeWidgetText(t().screenshotAutoRedactionNote)}` : '';

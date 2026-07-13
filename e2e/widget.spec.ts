@@ -2377,6 +2377,44 @@ test.describe('Keyboard Event Isolation', () => {
     const leakedCount = await page.evaluate(() => window.__hostKeystrokeCount ?? 0);
     expect(leakedCount).toBe(0);
   });
+
+  test('typing c survives a later widget-root shortcut listener', async ({ page }) => {
+    await page.route('**/api/check**', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ installed: true }),
+      });
+    });
+
+    await page.goto('/test/keyboard-conflict.html');
+    const host = page.locator('#bugdrop-host');
+    await expect(host.locator('css=.bd-trigger')).toBeVisible({ timeout: 5000 });
+    await host.locator('css=.bd-trigger').click();
+    await expect(host.locator('css=.bd-modal')).toBeVisible({ timeout: 5000 });
+    const getStartedBtn = host.locator('css=[data-action="continue"]');
+    if (await getStartedBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await getStartedBtn.click();
+    }
+
+    await page.evaluate(() => {
+      const shadowRoot = document.getElementById('bugdrop-host')?.shadowRoot;
+      shadowRoot?.addEventListener('keydown', event => {
+        if ((event as KeyboardEvent).key.toLowerCase() === 'c') event.preventDefault();
+      });
+    });
+
+    const titleInput = host.locator('css=#title');
+    const descInput = host.locator('css=#description');
+    await expect(titleInput).toBeVisible({ timeout: 5000 });
+    await titleInput.click();
+    await page.keyboard.type('c C calm check click');
+    await descInput.click();
+    await page.keyboard.type('c C capture character check');
+
+    await expect(titleInput).toHaveValue('c C calm check click');
+    await expect(descInput).toHaveValue('c C capture character check');
+  });
 });
 
 test.describe('Install URL from appName', () => {
@@ -5506,6 +5544,24 @@ test.describe('Screenshot Mode Configuration', () => {
         () => (window as Window & { __autoCaptureCount?: number }).__autoCaptureCount
       )
     ).toBe(1);
+  });
+
+  test('never mode submits directly without exposing or sending screenshot controls', async ({
+    page,
+  }) => {
+    await setupInstalledApp(page);
+    const getPayload = await setupSuccessfulSubmit(page);
+
+    await page.goto('/test/?screenshot=never');
+    const host = await openForm(page);
+
+    await expect(host.locator('css=#include-screenshot')).not.toBeAttached();
+    await expect(host.locator('css=#submit-btn')).toHaveText('Submit');
+    await host.locator('css=#submit-btn').click();
+
+    await expect(host.locator('css=.bd-success-icon')).toBeVisible({ timeout: 10000 });
+    await expect(host.locator('css=[data-action="capture"]')).not.toBeAttached();
+    expect(getPayload()?.screenshot).toBeNull();
   });
 
   test('auto mode capture failure can skip without offering the manual picker', async ({

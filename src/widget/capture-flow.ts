@@ -13,7 +13,7 @@ import { showScreenshotOptions, type ScreenshotChoice } from './screenshot-optio
 import { DEFAULT_SELECTED_ELEMENT_SCREENSHOT_PIXEL_RATIO } from '../defaults';
 
 export interface CaptureFlowConfig {
-  screenshotMode: 'optional' | 'auto' | 'required';
+  screenshotMode: 'never' | 'optional' | 'auto' | 'required';
   screenshotScale?: number;
   elementContextMaxArea?: number;
   accentColor?: string;
@@ -63,7 +63,7 @@ export async function runScreenshotCaptureFlow(
 ): Promise<CaptureFlowResult> {
   if (config.screenshotMode === 'auto') return captureAutomaticScreenshot(root, config);
 
-  if (!includeScreenshot) return emptyCaptureResult();
+  if (config.screenshotMode === 'never' || !includeScreenshot) return emptyCaptureResult();
 
   const screenshotRequired = config.screenshotMode === 'required';
   while (true) {

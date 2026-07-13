@@ -314,12 +314,13 @@ Control how screenshots are collected during the feedback flow.
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| `data-screenshot` | `"optional"` | Screenshot mode: `"optional"`, `"auto"`, or `"required"` |
+| `data-screenshot` | `"optional"` | Screenshot mode: `"never"`, `"optional"`, `"auto"`, or `"required"` |
 | `data-screenshot-scale` | `"2"` | Minimum pixel ratio for screenshot captures |
 | `data-element-context-max-area` | `"0"` | Maximum surrounding container size for Select Element captures, expressed as a multiple of the visible viewport area |
 
 ### Screenshot Modes
 
+- **`never`** -- Hides screenshot controls and submits feedback without a screenshot.
 - **`optional`** -- Shows the screenshot checkbox checked by default. Users can choose full page, element, area, annotate, redact, or skip.
 - **`auto`** -- Automatically captures a full-page screenshot after the form is submitted, without showing the manual screenshot picker or redaction step.
 - **`required`** -- Requires a screenshot before submission. Users can choose full page, element, or area, then annotate or redact before submitting.
@@ -393,7 +394,7 @@ computed relative to the captured context element.
 | Automatic screenshot | Yes | No | No | No in the current UI | Use only when marked sensitive regions are stable and supported |
 | Native viewport fallback | No | Yes | Yes | Existing unavailable-mask warning | Used for very complex pages; users must review manually |
 
-Disable screenshots or use `data-screenshot="optional"` on pages where sensitive
+Disable screenshots with `data-screenshot="never"` or use `data-screenshot="optional"` on pages where sensitive
 pixels cannot be reliably enclosed by DOM boxes.
 
 ```html

@@ -122,6 +122,34 @@ afterEach(() => {
 });
 
 describe('capture flow state decisions', () => {
+  it('never mode blocks capture even when a caller requests a screenshot', async () => {
+    const {
+      runScreenshotCaptureFlow,
+      screenshotOptionsMock,
+      captureWithLoadingMock,
+      captureAreaWithLoadingMock,
+    } = await loadCaptureFlowWithMocks({});
+    const onComplexScreenshotSkipped = vi.fn();
+
+    const result = await runScreenshotCaptureFlow(
+      document.createElement('div'),
+      { screenshotMode: 'never', theme: 'light' },
+      true,
+      onComplexScreenshotSkipped
+    );
+
+    expect(result).toEqual({
+      screenshot: null,
+      elementSelector: null,
+      fullElementSelector: null,
+      returnToForm: false,
+    });
+    expect(screenshotOptionsMock).not.toHaveBeenCalled();
+    expect(captureWithLoadingMock).not.toHaveBeenCalled();
+    expect(captureAreaWithLoadingMock).not.toHaveBeenCalled();
+    expect(onComplexScreenshotSkipped).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['explicit-skip', true],
     ['capture-failure-skip', true],
