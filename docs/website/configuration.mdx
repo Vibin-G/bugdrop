@@ -314,7 +314,7 @@ Control how screenshots are collected during the feedback flow.
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| `data-screenshot` | `"optional"` | Screenshot mode: `"never"`, `"optional"`, `"auto"`, or `"required"` |
+| `data-screenshot` | `"optional"` | Screenshot mode: `"never"`, `"optional"`, `"auto"`, `"required"`, or `"upload"` |
 | `data-screenshot-scale` | `"2"` | Minimum pixel ratio for screenshot captures |
 | `data-element-context-max-area` | `"0"` | Maximum surrounding container size for Select Element captures, expressed as a multiple of the visible viewport area |
 
@@ -324,8 +324,11 @@ Control how screenshots are collected during the feedback flow.
 - **`optional`** -- Shows the screenshot checkbox checked by default. Users can choose full page, element, area, annotate, redact, or skip.
 - **`auto`** -- Automatically captures a full-page screenshot after the form is submitted, without showing the manual screenshot picker or redaction step.
 - **`required`** -- Requires a screenshot before submission. Users can choose full page, element, or area, then annotate or redact before submitting.
+- **`upload`** -- Uses the device's native image picker instead of browser page capture. Users can minimize the report, take a phone screenshot, attach it, review the preview, and submit without losing their draft. PNG, JPEG, and WebP images up to 2 MB are accepted.
 
 Manual redaction is controlled by the person submitting feedback. Use developer-configured masking for fields that should be visually covered in supported screenshot modes, especially with automatic screenshots. Auto mode warns users that a full-page screenshot will be attached, but it does not show the manual picker or annotation review step.
+
+Upload mode is intended for server-mediated integrations. The selected image is included in the feedback payload as `screenshot`; the receiving server must authenticate the submitter, validate the decoded file type and size, and proxy the bytes to private storage. Do not put third-party storage credentials in the browser.
 
 ### Select Element screenshots
 

@@ -652,6 +652,114 @@ export function injectStyles(shadow: ShadowRoot, config: WidgetConfig) {
       padding-top: 3px;
     }
 
+    .bd-native-screenshot-control {
+      display: grid;
+      gap: 10px;
+      width: 100%;
+      padding: 12px;
+      border: var(--bd-border-style);
+      border-radius: var(--bd-radius-sm);
+      background: var(--bd-bg-secondary);
+    }
+
+    .bd-native-screenshot-title {
+      display: block;
+      color: var(--bd-text-primary);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .bd-native-screenshot-control p {
+      margin: 3px 0 0;
+      color: var(--bd-text-secondary);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .bd-native-screenshot-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .bd-native-screenshot-actions .bd-btn {
+      min-height: 36px;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .bd-native-screenshot-preview {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr) 32px;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .bd-native-screenshot-preview:empty {
+      display: none;
+    }
+
+    .bd-native-screenshot-image {
+      width: 52px;
+      height: 52px;
+      object-fit: cover;
+      border: var(--bd-border-style);
+      border-radius: var(--bd-radius-sm);
+      background: var(--bd-bg-tertiary);
+    }
+
+    .bd-native-screenshot-name {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--bd-text-primary);
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bd-screenshot-draft {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 1000001;
+      width: min(360px, calc(100vw - 32px));
+      padding: 16px;
+      border: var(--bd-border-style);
+      border-radius: var(--bd-radius-lg);
+      background: var(--bd-bg-primary);
+      box-shadow: var(--bd-shadow-lg), var(--bd-shadow-glow);
+      color: var(--bd-text-primary);
+    }
+
+    .bd-screenshot-draft--left {
+      right: auto;
+      left: 16px;
+    }
+
+    .bd-screenshot-draft strong {
+      display: block;
+      font-size: 15px;
+    }
+
+    .bd-screenshot-draft p {
+      margin: 6px 0 12px;
+      color: var(--bd-text-secondary);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .bd-screenshot-draft-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .bd-screenshot-draft-actions .bd-btn {
+      min-height: 40px;
+      padding: 9px 12px;
+      font-size: 14px;
+    }
+
     .bd-checkbox {
       width: 18px;
       height: 18px;
@@ -1229,8 +1337,25 @@ export function injectStyles(shadow: ShadowRoot, config: WidgetConfig) {
       }
 
       .bd-evidence-row {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: 1fr;
         gap: 8px;
+      }
+
+      .bd-native-screenshot-actions,
+      .bd-screenshot-draft-actions {
+        flex-direction: column;
+      }
+
+      .bd-native-screenshot-actions .bd-btn,
+      .bd-screenshot-draft-actions .bd-btn {
+        width: 100%;
+      }
+
+      .bd-screenshot-draft {
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        width: auto;
       }
 
       .bd-upload-button {

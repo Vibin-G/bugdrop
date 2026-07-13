@@ -92,7 +92,7 @@ interface WidgetConfig {
   // Welcome screen behavior
   welcome: 'once' | 'always' | 'never';
   // Screenshot configuration
-  screenshotMode: 'never' | 'optional' | 'auto' | 'required';
+  screenshotMode: 'never' | 'optional' | 'auto' | 'required' | 'upload';
   screenshotScale?: number; // Minimum pixel ratio for captures (default: 2)
   elementContextMaxArea?: number; // Max ancestor capture area as a viewport multiplier
   issueLinkVisibility: IssueLinkVisibility;
@@ -120,6 +120,7 @@ declare global {
 }
 
 interface FeedbackData {
+  submissionId: string;
   title: string;
   description: string;
   category: FeedbackCategory;
@@ -143,6 +144,8 @@ const TRIGGER_VIEWPORT_MARGIN_PX = 8;
 const TRIGGER_KEYBOARD_MOVE_PX = 16;
 const MAX_UPLOAD_FILES = 5;
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_NATIVE_SCREENSHOT_BYTES = 2 * 1024 * 1024;
+const ACCEPTED_NATIVE_SCREENSHOT_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const ACCEPTED_UPLOAD_TYPES = [
   'image/png',
   'image/jpeg',
@@ -485,10 +488,10 @@ const config: WidgetConfig = {
   // Screenshot configuration
   screenshotMode: (() => {
     const val = script?.dataset.screenshot;
-    if (val === 'never' || val === 'auto' || val === 'required') return val;
+    if (val === 'never' || val === 'auto' || val === 'required' || val === 'upload') return val;
     if (val && val !== 'optional') {
       console.warn(
-        `[BugDrop] Invalid data-screenshot "${val}". Expected "never", "optional", "auto", or "required".`
+        `[BugDrop] Invalid data-screenshot "${val}". Expected "never", "optional", "auto", "required", or "upload".`
       );
     }
     return 'optional' as const;
@@ -939,10 +942,8 @@ function exposeBugDropAPI(root: HTMLElement, config: WidgetConfig) {
     close: () => {
       if (_isModalOpen) {
         // Find and remove any open modal
-        const modal = root.querySelector('.bd-modal');
-        if (modal) {
-          modal.remove();
-        }
+        root.querySelector('.bd-overlay')?.remove();
+        root.querySelector('.bd-screenshot-draft')?.remove();
         _isModalOpen = false;
       }
     },
@@ -1139,12 +1140,13 @@ async function openFeedbackFlow(
 
     // Submit
     await submitFeedback(root, config, {
+      submissionId: crypto.randomUUID(),
       title: formResult.title,
       description: formResult.description,
       category: formResult.category,
       name: formResult.name,
       email: formResult.email,
-      screenshot: screenshotResult.screenshot,
+      screenshot: formResult.uploadedScreenshot?.dataUrl ?? screenshotResult.screenshot,
       attachments: formResult.attachments,
       elementSelector: screenshotResult.elementSelector,
       fullElementSelector: screenshotResult.fullElementSelector,
@@ -1263,6 +1265,7 @@ interface FeedbackFormResult {
   name?: string;
   email?: string;
   includeScreenshot: boolean;
+  uploadedScreenshot: FeedbackAttachment | null;
   attachments: FeedbackAttachment[];
   sendConsoleLogs: boolean;
 }
@@ -1337,17 +1340,25 @@ function showFeedbackFormWithScreenshotOption(
                    <p id="attachment-error" class="bd-field-error" hidden></p>`
                 : ''
             }
+            ${
+              config.screenshotMode === 'upload'
+                ? `<input type="file" id="screenshot-upload" accept="${ACCEPTED_NATIVE_SCREENSHOT_TYPES.join(',')}" class="bd-upload-input" />
+                   <div id="screenshot-preview" class="bd-native-screenshot-preview" aria-live="polite"></div>
+                   <p id="screenshot-upload-error" class="bd-field-error" hidden></p>`
+                : ''
+            }
             ${config.allowConsoleLogs ? getConsoleLogsFormControl(config, initialValues) : ''}
           </div>
           <div class="bd-actions">
             <button type="button" class="bd-btn bd-btn-secondary" data-action="cancel">${escapeWidgetText(t().cancel)}</button>
-            <button type="submit" class="bd-btn bd-btn-primary" id="submit-btn">${config.screenshotMode === 'auto' || config.screenshotMode === 'never' ? escapeWidgetText(t().submit) : escapeWidgetText(t().continueButton)}</button>
+            <button type="submit" class="bd-btn bd-btn-primary" id="submit-btn">${config.screenshotMode === 'auto' || config.screenshotMode === 'never' || config.screenshotMode === 'upload' ? escapeWidgetText(t().submit) : escapeWidgetText(t().continueButton)}</button>
           </div>
         </form>
       `
     );
 
     const form = modal.querySelector('#feedback-form') as HTMLFormElement;
+    const submitButton = modal.querySelector('#submit-btn') as HTMLButtonElement;
     const nameInput = modal.querySelector('#name') as HTMLInputElement | null;
     const emailInput = modal.querySelector('#email') as HTMLInputElement | null;
     const titleInput = modal.querySelector('#title') as HTMLInputElement;
@@ -1361,14 +1372,56 @@ function showFeedbackFormWithScreenshotOption(
     ) as HTMLButtonElement | null;
     const uploadList = modal.querySelector('#attachment-list') as HTMLElement | null;
     const uploadError = modal.querySelector('#attachment-error') as HTMLElement | null;
+    const screenshotInput = modal.querySelector('#screenshot-upload') as HTMLInputElement | null;
+    const screenshotPreview = modal.querySelector('#screenshot-preview') as HTMLElement | null;
+    const screenshotError = modal.querySelector('#screenshot-upload-error') as HTMLElement | null;
+    const minimizeForScreenshot = modal.querySelector(
+      '[data-action="minimize-for-screenshot"]'
+    ) as HTMLButtonElement | null;
+    const chooseScreenshot = modal.querySelector(
+      '[data-action="choose-screenshot"]'
+    ) as HTMLButtonElement | null;
     const consoleLogsCheckbox = modal.querySelector(
       '#send-console-logs'
     ) as HTMLInputElement | null;
     const closeBtn = modal.querySelector('.bd-close') as HTMLElement;
     const cancelBtn = modal.querySelector('[data-action="cancel"]') as HTMLElement;
     let attachments = config.allowUploads ? [...(initialValues?.attachments ?? [])] : [];
+    let uploadedScreenshot =
+      config.screenshotMode === 'upload' ? (initialValues?.uploadedScreenshot ?? null) : null;
+    let screenshotDraft: HTMLElement | null = null;
+    let screenshotReadPromise: Promise<void> | null = null;
+
+    const cleanupScreenshotDraft = () => {
+      screenshotDraft?.remove();
+      screenshotDraft = null;
+    };
+
+    const restoreReport = () => {
+      cleanupScreenshotDraft();
+      modal.style.display = '';
+    };
+
+    const openScreenshotPicker = () => screenshotInput?.click();
+
+    const renderUploadedScreenshot = () => {
+      if (!screenshotPreview) return;
+      renderNativeScreenshotPreview(screenshotPreview, uploadedScreenshot, () => {
+        uploadedScreenshot = null;
+        renderUploadedScreenshot();
+      });
+    };
+
+    const minimizeReport = () => {
+      if (!screenshotInput) return;
+      cleanupScreenshotDraft();
+      modal.style.display = 'none';
+      screenshotDraft = createNativeScreenshotDraft(config, openScreenshotPicker, restoreReport);
+      root.appendChild(screenshotDraft);
+    };
 
     const closeModal = () => {
+      cleanupScreenshotDraft();
       modal.remove();
       resolve(null);
     };
@@ -1376,8 +1429,9 @@ function showFeedbackFormWithScreenshotOption(
     closeBtn?.addEventListener('click', closeModal);
     cancelBtn?.addEventListener('click', closeModal);
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
+      await screenshotReadPromise;
 
       // Validate required fields
       if (!titleInput.value.trim()) {
@@ -1406,7 +1460,7 @@ function showFeedbackFormWithScreenshotOption(
       ) as HTMLInputElement;
       const category = (categoryInput?.value || 'bug') as FeedbackCategory;
       const includeScreenshot =
-        config.screenshotMode === 'never'
+        config.screenshotMode === 'never' || config.screenshotMode === 'upload'
           ? false
           : config.screenshotMode === 'optional'
             ? (screenshotCheckbox?.checked ?? false)
@@ -1415,6 +1469,7 @@ function showFeedbackFormWithScreenshotOption(
         clearComplexScreenshotsSkipped(config.repo);
       }
 
+      cleanupScreenshotDraft();
       modal.remove();
       resolve({
         title: titleInput.value.trim(),
@@ -1423,6 +1478,7 @@ function showFeedbackFormWithScreenshotOption(
         name: nameInput?.value.trim() || undefined,
         email: emailInput?.value.trim() || undefined,
         includeScreenshot,
+        uploadedScreenshot,
         attachments,
         sendConsoleLogs: config.allowConsoleLogs && Boolean(consoleLogsCheckbox?.checked),
       });
@@ -1472,7 +1528,46 @@ function showFeedbackFormWithScreenshotOption(
       }
     });
 
+    minimizeForScreenshot?.addEventListener('click', minimizeReport);
+    chooseScreenshot?.addEventListener('click', openScreenshotPicker);
+    screenshotInput?.addEventListener('change', () => {
+      const file = screenshotInput.files?.[0];
+      screenshotInput.value = '';
+      if (!file || !screenshotError) return;
+      screenshotError.textContent = '';
+      screenshotError.hidden = true;
+
+      const validationError = validateNativeScreenshotFile(file);
+      if (validationError) {
+        restoreReport();
+        showUploadError(screenshotError, validationError);
+        return;
+      }
+
+      submitButton.disabled = true;
+      form.setAttribute('aria-busy', 'true');
+      const readPromise = (async () => {
+        try {
+          const screenshot = await fileToAttachment(file);
+          await verifyImageDataUrl(screenshot.dataUrl);
+          uploadedScreenshot = screenshot;
+          restoreReport();
+          renderUploadedScreenshot();
+        } catch {
+          restoreReport();
+          showUploadError(screenshotError, t().screenshotReadError);
+        }
+      })();
+      screenshotReadPromise = readPromise;
+      void readPromise.finally(() => {
+        if (screenshotReadPromise === readPromise) screenshotReadPromise = null;
+        submitButton.disabled = false;
+        form.removeAttribute('aria-busy');
+      });
+    });
+
     rerenderUploads();
+    renderUploadedScreenshot();
   });
 }
 
@@ -1501,6 +1596,72 @@ function validateUploadFile(file: File): string | null {
     return t().uploadTooLarge(formatFileSize(MAX_UPLOAD_SIZE_BYTES));
   }
   return null;
+}
+
+function validateNativeScreenshotFile(file: File): string | null {
+  if (!ACCEPTED_NATIVE_SCREENSHOT_TYPES.includes(file.type)) {
+    return t().screenshotUnsupportedType;
+  }
+  if (file.size <= 0 || file.size > MAX_NATIVE_SCREENSHOT_BYTES) {
+    return t().screenshotTooLarge(formatFileSize(MAX_NATIVE_SCREENSHOT_BYTES));
+  }
+  return null;
+}
+
+function renderNativeScreenshotPreview(
+  target: HTMLElement,
+  screenshot: FeedbackAttachment | null,
+  onRemove: () => void
+): void {
+  target.replaceChildren();
+  if (!screenshot) return;
+
+  const image = document.createElement('img');
+  image.className = 'bd-native-screenshot-image';
+  image.src = screenshot.dataUrl;
+  image.alt = '';
+
+  const name = document.createElement('span');
+  name.className = 'bd-native-screenshot-name';
+  name.textContent = screenshot.name;
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'bd-upload-remove';
+  remove.setAttribute('aria-label', t().removeScreenshotAriaLabel);
+  remove.textContent = '×';
+  remove.addEventListener('click', onRemove);
+
+  target.append(image, name, remove);
+}
+
+function createNativeScreenshotDraft(
+  config: WidgetConfig,
+  onAttach: () => void,
+  onReturn: () => void
+): HTMLElement {
+  const draft = document.createElement('section');
+  draft.className = `bd-screenshot-draft bd-screenshot-draft--${config.position === 'bottom-left' ? 'left' : 'right'}`;
+
+  const title = document.createElement('strong');
+  title.textContent = t().screenshotDraftTitle;
+  const hint = document.createElement('p');
+  hint.textContent = t().screenshotDraftHint;
+  const actions = document.createElement('div');
+  actions.className = 'bd-screenshot-draft-actions';
+  const attach = document.createElement('button');
+  attach.type = 'button';
+  attach.className = 'bd-btn bd-btn-primary';
+  attach.textContent = t().attachScreenshot;
+  attach.addEventListener('click', onAttach);
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'bd-btn bd-btn-secondary';
+  back.textContent = t().returnToReport;
+  back.addEventListener('click', onReturn);
+  actions.append(attach, back);
+  draft.append(title, hint, actions);
+  return draft;
 }
 
 function showUploadError(target: HTMLElement, message: string) {
@@ -1553,6 +1714,18 @@ function fileToAttachment(file: File): Promise<FeedbackAttachment> {
   });
 }
 
+function verifyImageDataUrl(dataUrl: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => {
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) resolve();
+      else reject(new Error('Image has no visible dimensions.'));
+    });
+    image.addEventListener('error', () => reject(new Error('Could not decode image.')));
+    image.src = dataUrl;
+  });
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -1574,6 +1747,21 @@ function getScreenshotFormControl(
       <p style="margin: 8px 0 0; color: var(--bd-text-secondary); font-size: 0.95rem;">
         ${escapeWidgetText(t().screenshotAutoNote)}${redactionNote}
       </p>
+    `;
+  }
+
+  if (config.screenshotMode === 'upload') {
+    return `
+      <div class="bd-native-screenshot-control">
+        <div>
+          <span class="bd-native-screenshot-title">${escapeWidgetText(t().screenshotUploadTitle)}</span>
+          <p>${escapeWidgetText(t().screenshotUploadHint)}</p>
+        </div>
+        <div class="bd-native-screenshot-actions">
+          <button type="button" class="bd-btn bd-btn-secondary" data-action="minimize-for-screenshot">${escapeWidgetText(t().takeScreenshot)}</button>
+          <button type="button" class="bd-btn bd-btn-quiet" data-action="choose-screenshot">${escapeWidgetText(t().chooseExistingScreenshot)}</button>
+        </div>
+      </div>
     `;
   }
 
@@ -1653,6 +1841,7 @@ async function submitFeedback(root: HTMLElement, config: WidgetConfig, data: Fee
         ...(await getAuthHeaders(config.authTokenProvider)),
       },
       body: JSON.stringify({
+        submissionId: data.submissionId,
         repo: config.repo,
         title: data.title,
         description: data.description,

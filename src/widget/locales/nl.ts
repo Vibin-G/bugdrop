@@ -42,6 +42,21 @@ export const nl: WidgetStrings = {
   screenshotRequiredNote: '📸 Een schermafbeelding is vereist voordat u kunt versturen.',
   includeScreenshotLabel: '📸 Schermafbeelding toevoegen',
   sendConsoleLogsLabel: 'Consolelogboeken meesturen',
+  screenshotUploadTitle: 'Schermafbeelding',
+  screenshotUploadHint:
+    'Voeg een schermafbeelding van dit apparaat toe en controleer die voor verzending.',
+  takeScreenshot: 'Schermafbeelding maken',
+  chooseExistingScreenshot: 'Bestaande kiezen',
+  screenshotDraftTitle: 'Melding opgeslagen',
+  screenshotDraftHint:
+    'Maak de schermafbeelding met de knoppen van uw telefoon en voeg die hier toe.',
+  attachScreenshot: 'Schermafbeelding toevoegen',
+  returnToReport: 'Terug naar melding',
+  screenshotUnsupportedType: 'Kies een PNG-, JPEG- of WebP-schermafbeelding.',
+  screenshotTooLarge: (maxSize: string) =>
+    `De schermafbeelding is te groot. Kies een afbeelding tot ${maxSize}.`,
+  screenshotReadError: 'Kan die schermafbeelding niet lezen. Probeer een andere.',
+  removeScreenshotAriaLabel: 'Schermafbeelding verwijderen',
   // Uploads
   uploadsAriaLabel: 'Uploads',
   uploadFilesAriaLabel: 'Bestanden uploaden',

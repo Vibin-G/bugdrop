@@ -41,6 +41,18 @@ export interface WidgetStrings {
   screenshotRequiredNote: string;
   includeScreenshotLabel: string;
   sendConsoleLogsLabel: string;
+  screenshotUploadTitle: string;
+  screenshotUploadHint: string;
+  takeScreenshot: string;
+  chooseExistingScreenshot: string;
+  screenshotDraftTitle: string;
+  screenshotDraftHint: string;
+  attachScreenshot: string;
+  returnToReport: string;
+  screenshotUnsupportedType: string;
+  screenshotTooLarge: (maxSize: string) => string;
+  screenshotReadError: string;
+  removeScreenshotAriaLabel: string;
   // Uploads
   uploadsAriaLabel: string;
   uploadFilesAriaLabel: string;

@@ -5564,6 +5564,149 @@ test.describe('Screenshot Mode Configuration', () => {
     expect(getPayload()?.screenshot).toBeNull();
   });
 
+  test('upload mode minimizes the mobile form and attaches a native screenshot', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await setupInstalledApp(page);
+    const getPayload = await setupSuccessfulSubmit(page);
+
+    await page.goto('/test/?screenshot=upload');
+    const host = await openForm(page);
+    const modal = host.locator('css=.bd-modal');
+
+    await expect(host.locator('css=[data-action="minimize-for-screenshot"]')).toHaveText(
+      'Take screenshot'
+    );
+    await expect(host.locator('css=[data-action="choose-screenshot"]')).toHaveText(
+      'Choose existing'
+    );
+    await host.locator('css=#description').fill('Mobile screenshot flow');
+    await host.locator('css=[data-action="minimize-for-screenshot"]').click();
+
+    await expect(modal).toBeHidden();
+    await expect(host.locator('css=.bd-overlay')).toBeHidden();
+    await expect(host.locator('css=.bd-screenshot-draft')).toBeVisible();
+    await expect(host.locator('css=.bd-screenshot-draft')).toContainText(
+      'Take the screenshot with your phone buttons'
+    );
+
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      host.locator('css=.bd-screenshot-draft .bd-btn-primary').click(),
+    ]);
+    await fileChooser.setFiles({
+      name: 'Screenshot_20260713.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(STUB_PNG.split(',')[1]!, 'base64'),
+    });
+
+    await expect(host.locator('css=.bd-screenshot-draft')).not.toBeAttached();
+    await expect(modal).toBeVisible();
+    await expect(host.locator('css=.bd-native-screenshot-preview')).toBeVisible();
+    await expect(host.locator('css=.bd-native-screenshot-name')).toHaveText(
+      'Screenshot_20260713.png'
+    );
+    await expect(host.locator('css=#description')).toHaveValue('Mobile screenshot flow');
+
+    await host.locator('css=#submit-btn').click();
+    await expect(host.locator('css=.bd-success-icon')).toBeVisible({ timeout: 10000 });
+    expect(getPayload()?.screenshot).toBe(STUB_PNG);
+    expect(getPayload()?.attachments).toEqual([]);
+  });
+
+  test('upload mode returns to the populated report after minimizing', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await setupInstalledApp(page);
+    await page.goto('/test/?screenshot=upload');
+    const host = await openForm(page);
+
+    await host.locator('css=#title').fill('Saved mobile title');
+    await host.locator('css=#description').fill('Saved mobile details');
+    await host.locator('css=input[name="category"][value="feature"]').check();
+    await host.locator('css=[data-action="minimize-for-screenshot"]').click();
+    await host.locator('css=.bd-screenshot-draft .bd-btn-secondary').click();
+
+    await expect(host.locator('css=.bd-modal')).toBeVisible();
+    await expect(host.locator('css=#title')).toHaveValue('Saved mobile title');
+    await expect(host.locator('css=#description')).toHaveValue('Saved mobile details');
+    await expect(host.locator('css=input[name="category"][value="feature"]')).toBeChecked();
+  });
+
+  test('upload mode waits for image decoding before submission', async ({ page }) => {
+    await setupInstalledApp(page);
+    const getPayload = await setupSuccessfulSubmit(page);
+    await page.goto('/test/?screenshot=upload');
+    const host = await openForm(page);
+    await host.locator('css=#title').fill('Decode race');
+
+    await page.evaluate(() => {
+      const original = FileReader.prototype.readAsDataURL;
+      FileReader.prototype.readAsDataURL = function (blob: Blob) {
+        window.setTimeout(() => original.call(this, blob), 200);
+      };
+    });
+    await host.locator('css=#screenshot-upload').setInputFiles({
+      name: 'delayed.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(STUB_PNG.split(',')[1]!, 'base64'),
+    });
+
+    await expect(host.locator('css=#submit-btn')).toBeDisabled();
+    await host.locator('css=#submit-btn').click();
+    await expect(host.locator('css=.bd-success-icon')).toBeVisible({ timeout: 10000 });
+    expect(getPayload()?.screenshot).toBe(STUB_PNG);
+  });
+
+  test('upload mode rejects non-image evidence without losing the draft', async ({ page }) => {
+    await setupInstalledApp(page);
+    await page.goto('/test/?screenshot=upload');
+    const host = await openForm(page);
+
+    await host.locator('css=#description').fill('Keep this draft');
+    await host.locator('css=#screenshot-upload').setInputFiles({
+      name: 'trip.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n'),
+    });
+
+    await expect(host.locator('css=#screenshot-upload-error')).toContainText(
+      'Choose a PNG, JPEG, or WebP screenshot'
+    );
+    await expect(host.locator('css=.bd-native-screenshot-preview')).not.toBeVisible();
+    await expect(host.locator('css=#description')).toHaveValue('Keep this draft');
+  });
+
+  test('submission retry reuses the same idempotency key', async ({ page }) => {
+    await setupInstalledApp(page);
+    const submissionIds: unknown[] = [];
+    let attempt = 0;
+    await page.route('**/feedback', async route => {
+      attempt += 1;
+      submissionIds.push(route.request().postDataJSON().submissionId);
+      await route.fulfill({
+        status: attempt === 1 ? 502 : 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          attempt === 1
+            ? { error: 'Temporary failure' }
+            : { success: true, issueNumber: 1, issueUrl: '#', isPublic: false }
+        ),
+      });
+    });
+
+    await page.goto('/test/?screenshot=upload');
+    const host = await openForm(page);
+    await host.locator('css=#submit-btn').click();
+    await expect(host.locator('css=[data-action="retry"]')).toBeVisible();
+    await host.locator('css=[data-action="retry"]').click();
+    await expect(host.locator('css=.bd-success-icon')).toBeVisible({ timeout: 10000 });
+
+    expect(submissionIds).toHaveLength(2);
+    expect(submissionIds[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(submissionIds[1]).toBe(submissionIds[0]);
+  });
+
   test('auto mode capture failure can skip without offering the manual picker', async ({
     page,
   }) => {

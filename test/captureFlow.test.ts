@@ -150,6 +150,32 @@ describe('capture flow state decisions', () => {
     expect(onComplexScreenshotSkipped).not.toHaveBeenCalled();
   });
 
+  it('upload mode never invokes browser screenshot capture', async () => {
+    const {
+      runScreenshotCaptureFlow,
+      screenshotOptionsMock,
+      captureWithLoadingMock,
+      captureAreaWithLoadingMock,
+    } = await loadCaptureFlowWithMocks({});
+
+    const result = await runScreenshotCaptureFlow(
+      document.createElement('div'),
+      { screenshotMode: 'upload', theme: 'light' },
+      true,
+      vi.fn()
+    );
+
+    expect(result).toEqual({
+      screenshot: null,
+      elementSelector: null,
+      fullElementSelector: null,
+      returnToForm: false,
+    });
+    expect(screenshotOptionsMock).not.toHaveBeenCalled();
+    expect(captureWithLoadingMock).not.toHaveBeenCalled();
+    expect(captureAreaWithLoadingMock).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['explicit-skip', true],
     ['capture-failure-skip', true],
