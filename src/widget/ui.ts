@@ -723,13 +723,8 @@ export function injectStyles(shadow: ShadowRoot, config: WidgetConfig) {
       right: 16px;
       bottom: 16px;
       z-index: 1000001;
-      width: min(360px, calc(100vw - 32px));
-      padding: 16px;
-      border: var(--bd-border-style);
-      border-radius: var(--bd-radius-lg);
-      background: var(--bd-bg-primary);
-      box-shadow: var(--bd-shadow-lg), var(--bd-shadow-glow);
-      color: var(--bd-text-primary);
+      width: 56px;
+      height: 56px;
     }
 
     .bd-screenshot-draft--left {
@@ -737,27 +732,53 @@ export function injectStyles(shadow: ShadowRoot, config: WidgetConfig) {
       left: 16px;
     }
 
-    .bd-screenshot-draft strong {
-      display: block;
-      font-size: 15px;
+    .bd-screenshot-draft-attach,
+    .bd-screenshot-draft-return {
+      display: grid;
+      place-items: center;
+      border: 0;
+      font: inherit;
+      cursor: pointer;
     }
 
-    .bd-screenshot-draft p {
-      margin: 6px 0 12px;
+    .bd-screenshot-draft-attach {
+      width: 56px;
+      height: 56px;
+      border-radius: 999px;
+      background: var(--bd-primary);
+      box-shadow: var(--bd-shadow-lg), var(--bd-shadow-glow);
+      color: var(--bd-primary-text);
+    }
+
+    .bd-screenshot-draft-attach:hover {
+      background: var(--bd-primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .bd-screenshot-draft-attach:focus-visible,
+    .bd-screenshot-draft-return:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--bd-primary) 35%, transparent);
+      outline-offset: 2px;
+    }
+
+    .bd-screenshot-draft-attach svg {
+      width: 25px;
+      height: 25px;
+    }
+
+    .bd-screenshot-draft-return {
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      width: 24px;
+      height: 24px;
+      border: var(--bd-border-style);
+      border-radius: 999px;
+      background: var(--bd-bg-primary);
+      box-shadow: var(--bd-shadow-sm);
       color: var(--bd-text-secondary);
-      font-size: 13px;
-      line-height: 1.45;
-    }
-
-    .bd-screenshot-draft-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .bd-screenshot-draft-actions .bd-btn {
-      min-height: 40px;
-      padding: 9px 12px;
-      font-size: 14px;
+      font-size: 18px;
+      line-height: 1;
     }
 
     .bd-checkbox {
@@ -1341,21 +1362,22 @@ export function injectStyles(shadow: ShadowRoot, config: WidgetConfig) {
         gap: 8px;
       }
 
-      .bd-native-screenshot-actions,
-      .bd-screenshot-draft-actions {
+      .bd-native-screenshot-actions {
         flex-direction: column;
       }
 
-      .bd-native-screenshot-actions .bd-btn,
-      .bd-screenshot-draft-actions .bd-btn {
+      .bd-native-screenshot-actions .bd-btn {
         width: 100%;
       }
 
       .bd-screenshot-draft {
         right: 12px;
         bottom: 12px;
+      }
+
+      .bd-screenshot-draft--left {
+        right: auto;
         left: 12px;
-        width: auto;
       }
 
       .bd-upload-button {

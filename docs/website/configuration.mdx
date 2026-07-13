@@ -324,7 +324,7 @@ Control how screenshots are collected during the feedback flow.
 - **`optional`** -- Shows the screenshot checkbox checked by default. Users can choose full page, element, area, annotate, redact, or skip.
 - **`auto`** -- Automatically captures a full-page screenshot after the form is submitted, without showing the manual screenshot picker or redaction step.
 - **`required`** -- Requires a screenshot before submission. Users can choose full page, element, or area, then annotate or redact before submitting.
-- **`upload`** -- Uses the device's native image picker instead of browser page capture. Users can minimize the report, take a phone screenshot, attach it, review the preview, and submit without losing their draft. PNG, JPEG, and WebP images up to 2 MB are accepted.
+- **`upload`** -- Uses the device's native image picker instead of browser page capture. Users can minimize the report to a small attachment icon, take a phone screenshot, attach it, review the preview, and submit without losing their draft. PNG, JPEG, and WebP source images up to 12 MB are automatically converted to a JPEG no larger than 1.8 MB before submission.
 
 Manual redaction is controlled by the person submitting feedback. Use developer-configured masking for fields that should be visually covered in supported screenshot modes, especially with automatic screenshots. Auto mode warns users that a full-page screenshot will be attached, but it does not show the manual picker or annotation review step.
 

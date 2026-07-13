@@ -44,18 +44,17 @@ export const nl: WidgetStrings = {
   sendConsoleLogsLabel: 'Consolelogboeken meesturen',
   screenshotUploadTitle: 'Schermafbeelding',
   screenshotUploadHint:
-    'Voeg een schermafbeelding van dit apparaat toe en controleer die voor verzending.',
+    'Voeg een schermafbeelding toe. Telefoonafbeeldingen worden automatisch geoptimaliseerd.',
   takeScreenshot: 'Schermafbeelding maken',
   chooseExistingScreenshot: 'Bestaande kiezen',
-  screenshotDraftTitle: 'Melding opgeslagen',
   screenshotDraftHint:
     'Maak de schermafbeelding met de knoppen van uw telefoon en voeg die hier toe.',
   attachScreenshot: 'Schermafbeelding toevoegen',
   returnToReport: 'Terug naar melding',
-  screenshotUnsupportedType: 'Kies een PNG-, JPEG- of WebP-schermafbeelding.',
+  screenshotUnsupportedType: 'Kies een afbeelding van uw telefoon.',
   screenshotTooLarge: (maxSize: string) =>
     `De schermafbeelding is te groot. Kies een afbeelding tot ${maxSize}.`,
-  screenshotReadError: 'Kan die schermafbeelding niet lezen. Probeer een andere.',
+  screenshotReadError: 'Kan die telefoonafbeelding niet converteren. Probeer een andere.',
   removeScreenshotAriaLabel: 'Schermafbeelding verwijderen',
   // Uploads
   uploadsAriaLabel: 'Uploads',

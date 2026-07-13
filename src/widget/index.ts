@@ -38,6 +38,12 @@ import {
   shouldCheckProviderInstallation,
   type FeedbackProvider,
 } from './provider-config';
+import {
+  isNativeScreenshotCandidate,
+  MAX_NATIVE_SCREENSHOT_SOURCE_BYTES,
+  NATIVE_SCREENSHOT_ACCEPT,
+  normalizeNativeScreenshotFile,
+} from './native-screenshot';
 
 type FeedbackCategory = 'bug' | 'feature' | 'question';
 type CategoryLabelConfig = Partial<Record<FeedbackCategory, string | string[]>>;
@@ -144,8 +150,6 @@ const TRIGGER_VIEWPORT_MARGIN_PX = 8;
 const TRIGGER_KEYBOARD_MOVE_PX = 16;
 const MAX_UPLOAD_FILES = 5;
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
-const MAX_NATIVE_SCREENSHOT_BYTES = 2 * 1024 * 1024;
-const ACCEPTED_NATIVE_SCREENSHOT_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const ACCEPTED_UPLOAD_TYPES = [
   'image/png',
   'image/jpeg',
@@ -1342,7 +1346,7 @@ function showFeedbackFormWithScreenshotOption(
             }
             ${
               config.screenshotMode === 'upload'
-                ? `<input type="file" id="screenshot-upload" accept="${ACCEPTED_NATIVE_SCREENSHOT_TYPES.join(',')}" class="bd-upload-input" />
+                ? `<input type="file" id="screenshot-upload" accept="${NATIVE_SCREENSHOT_ACCEPT}" class="bd-upload-input" />
                    <div id="screenshot-preview" class="bd-native-screenshot-preview" aria-live="polite"></div>
                    <p id="screenshot-upload-error" class="bd-field-error" hidden></p>`
                 : ''
@@ -1397,9 +1401,10 @@ function showFeedbackFormWithScreenshotOption(
       screenshotDraft = null;
     };
 
-    const restoreReport = () => {
+    const restoreReport = (focusTarget?: HTMLElement | null) => {
       cleanupScreenshotDraft();
       modal.style.display = '';
+      focusTarget?.focus();
     };
 
     const openScreenshotPicker = () => screenshotInput?.click();
@@ -1409,6 +1414,7 @@ function showFeedbackFormWithScreenshotOption(
       renderNativeScreenshotPreview(screenshotPreview, uploadedScreenshot, () => {
         uploadedScreenshot = null;
         renderUploadedScreenshot();
+        chooseScreenshot?.focus();
       });
     };
 
@@ -1416,8 +1422,11 @@ function showFeedbackFormWithScreenshotOption(
       if (!screenshotInput) return;
       cleanupScreenshotDraft();
       modal.style.display = 'none';
-      screenshotDraft = createNativeScreenshotDraft(config, openScreenshotPicker, restoreReport);
+      screenshotDraft = createNativeScreenshotDraft(config, openScreenshotPicker, () =>
+        restoreReport(minimizeForScreenshot)
+      );
       root.appendChild(screenshotDraft);
+      screenshotDraft.querySelector<HTMLButtonElement>('.bd-screenshot-draft-attach')?.focus();
     };
 
     const closeModal = () => {
@@ -1539,7 +1548,7 @@ function showFeedbackFormWithScreenshotOption(
 
       const validationError = validateNativeScreenshotFile(file);
       if (validationError) {
-        restoreReport();
+        restoreReport(chooseScreenshot);
         showUploadError(screenshotError, validationError);
         return;
       }
@@ -1552,15 +1561,19 @@ function showFeedbackFormWithScreenshotOption(
         (button as HTMLButtonElement).disabled = true;
       });
       form.setAttribute('aria-busy', 'true');
+      let focusAfterRead: HTMLElement | null = null;
       const readPromise = (async () => {
         try {
-          const screenshot = await fileToAttachment(file);
+          const normalizedFile = await normalizeNativeScreenshotFile(file);
+          const screenshot = await fileToAttachment(normalizedFile);
           await verifyImageDataUrl(screenshot.dataUrl);
           uploadedScreenshot = screenshot;
-          restoreReport();
+          restoreReport(chooseScreenshot);
           renderUploadedScreenshot();
+          screenshotPreview?.querySelector<HTMLButtonElement>('.bd-upload-remove')?.focus();
         } catch {
           restoreReport();
+          focusAfterRead = chooseScreenshot;
           showUploadError(screenshotError, t().screenshotReadError);
         }
       })();
@@ -1572,6 +1585,7 @@ function showFeedbackFormWithScreenshotOption(
         chooseScreenshot?.removeAttribute('disabled');
         screenshotInput.disabled = false;
         form.removeAttribute('aria-busy');
+        focusAfterRead?.focus();
       });
     });
 
@@ -1608,11 +1622,11 @@ function validateUploadFile(file: File): string | null {
 }
 
 function validateNativeScreenshotFile(file: File): string | null {
-  if (!ACCEPTED_NATIVE_SCREENSHOT_TYPES.includes(file.type)) {
+  if (!isNativeScreenshotCandidate(file)) {
     return t().screenshotUnsupportedType;
   }
-  if (file.size <= 0 || file.size > MAX_NATIVE_SCREENSHOT_BYTES) {
-    return t().screenshotTooLarge(formatFileSize(MAX_NATIVE_SCREENSHOT_BYTES));
+  if (file.size <= 0 || file.size > MAX_NATIVE_SCREENSHOT_SOURCE_BYTES) {
+    return t().screenshotTooLarge(formatFileSize(MAX_NATIVE_SCREENSHOT_SOURCE_BYTES));
   }
   return null;
 }
@@ -1650,26 +1664,27 @@ function createNativeScreenshotDraft(
   onReturn: () => void
 ): HTMLElement {
   const draft = document.createElement('section');
-  draft.className = `bd-screenshot-draft bd-screenshot-draft--${config.position === 'bottom-left' ? 'left' : 'right'}`;
-
-  const title = document.createElement('strong');
-  title.textContent = t().screenshotDraftTitle;
-  const hint = document.createElement('p');
-  hint.textContent = t().screenshotDraftHint;
-  const actions = document.createElement('div');
-  actions.className = 'bd-screenshot-draft-actions';
+  draft.className = 'bd-screenshot-draft';
+  if (config.position === 'bottom-left') draft.classList.add('bd-screenshot-draft--left');
+  draft.setAttribute('aria-label', t().screenshotDraftHint);
   const attach = document.createElement('button');
   attach.type = 'button';
-  attach.className = 'bd-btn bd-btn-primary';
-  attach.textContent = t().attachScreenshot;
+  attach.className = 'bd-screenshot-draft-attach';
+  attach.setAttribute('aria-label', t().attachScreenshot);
+  attach.title = t().attachScreenshot;
+  attach.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M14.5 6.5 8 13a3 3 0 0 0 4.25 4.25l7-7a5 5 0 0 0-7.07-7.07l-7.5 7.5a7 7 0 0 0 9.9 9.9L21 14" />
+    </svg>`;
   attach.addEventListener('click', onAttach);
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'bd-btn bd-btn-secondary';
-  back.textContent = t().returnToReport;
+  back.className = 'bd-screenshot-draft-return';
+  back.setAttribute('aria-label', t().returnToReport);
+  back.title = t().returnToReport;
+  back.textContent = '×';
   back.addEventListener('click', onReturn);
-  actions.append(attach, back);
-  draft.append(title, hint, actions);
+  draft.append(attach, back);
   return draft;
 }
 

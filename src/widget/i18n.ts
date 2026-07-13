@@ -45,7 +45,6 @@ export interface WidgetStrings {
   screenshotUploadHint: string;
   takeScreenshot: string;
   chooseExistingScreenshot: string;
-  screenshotDraftTitle: string;
   screenshotDraftHint: string;
   attachScreenshot: string;
   returnToReport: string;

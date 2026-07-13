@@ -42,17 +42,17 @@ export const en: WidgetStrings = {
   includeScreenshotLabel: '📸 Include a screenshot',
   sendConsoleLogsLabel: 'Send Console Logs',
   screenshotUploadTitle: 'Screenshot',
-  screenshotUploadHint: 'Attach a screenshot from this device. Review it before submitting.',
+  screenshotUploadHint:
+    'Attach a screenshot from this device. Phone images are optimized automatically.',
   takeScreenshot: 'Take screenshot',
   chooseExistingScreenshot: 'Choose existing',
-  screenshotDraftTitle: 'Report saved',
   screenshotDraftHint: 'Take the screenshot with your phone buttons, then attach it here.',
   attachScreenshot: 'Attach screenshot',
   returnToReport: 'Back to report',
-  screenshotUnsupportedType: 'Choose a PNG, JPEG, or WebP screenshot.',
+  screenshotUnsupportedType: 'Choose an image from your phone.',
   screenshotTooLarge: (maxSize: string) =>
     `Screenshot is too large. Choose an image up to ${maxSize}.`,
-  screenshotReadError: 'Could not read that screenshot. Try another one.',
+  screenshotReadError: 'Could not convert that phone image. Try another screenshot.',
   removeScreenshotAriaLabel: 'Remove screenshot',
   // Uploads
   uploadsAriaLabel: 'Uploads',
