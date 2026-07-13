@@ -202,12 +202,15 @@ export async function uploadScreenshotAsAsset(
   repo: string,
   base64DataUrl: string
 ): Promise<string> {
+  const contentType = base64DataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,/)?.[1];
+  const extension =
+    contentType === 'image/jpeg' ? 'jpg' : contentType === 'image/webp' ? 'webp' : 'png';
   // Remove data URL prefix and extract the base64 content
-  const content = base64DataUrl.replace(/^data:image\/\w+;base64,/, '');
+  const content = base64DataUrl.replace(/^data:image\/(?:png|jpeg|webp);base64,/, '');
 
   // Generate unique filename with timestamp
   const timestamp = Date.now();
-  const filename = `.bugdrop/screenshots/${timestamp}.png`;
+  const filename = `.bugdrop/screenshots/${timestamp}.${extension}`;
 
   return uploadBase64Asset(
     token,

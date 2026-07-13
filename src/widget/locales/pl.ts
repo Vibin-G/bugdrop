@@ -48,6 +48,18 @@ export const pl: WidgetStrings = {
   screenshotRequiredNote: '📸 Zrzut ekranu jest wymagany przed wysłaniem.',
   includeScreenshotLabel: '📸 Dołącz zrzut ekranu',
   sendConsoleLogsLabel: 'Wyślij logi konsoli',
+  screenshotUploadTitle: 'Zrzut ekranu',
+  screenshotUploadHint: 'Dołącz zrzut ekranu. Obrazy z telefonu są optymalizowane automatycznie.',
+  takeScreenshot: 'Zrób zrzut ekranu',
+  chooseExistingScreenshot: 'Wybierz istniejący',
+  screenshotDraftHint: 'Zrób zrzut przyciskami telefonu, a następnie dołącz go tutaj.',
+  attachScreenshot: 'Dołącz zrzut',
+  returnToReport: 'Wróć do zgłoszenia',
+  screenshotUnsupportedType: 'Wybierz obraz z telefonu.',
+  screenshotTooLarge: (maxSize: string) =>
+    `Zrzut ekranu jest za duży. Wybierz obraz do ${maxSize}.`,
+  screenshotReadError: 'Nie udało się przekonwertować obrazu. Spróbuj innego zrzutu.',
+  removeScreenshotAriaLabel: 'Usuń zrzut ekranu',
   // Uploads
   uploadsAriaLabel: 'Załączniki',
   uploadFilesAriaLabel: 'Prześlij pliki',

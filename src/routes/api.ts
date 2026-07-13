@@ -153,7 +153,7 @@ api.post('/feedback', async c => {
     );
   }
 
-  // Validate screenshot payload. The browser widget emits PNG data URLs, but
+  // Validate screenshot payload. The browser widget emits raster image data URLs, but
   // callers can hit the API directly, so the server must not trust the prefix.
   const maxSizeMB = parseInt(c.env.MAX_SCREENSHOT_SIZE_MB || '5', 10);
   if (payload.screenshot) {
@@ -386,21 +386,23 @@ type LabelResolution = {
 type UploadedAttachment = FeedbackAttachment & { url: string };
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+type ScreenshotContentType = 'image/png' | 'image/jpeg' | 'image/webp';
 
 function validateScreenshotDataUrl(dataUrl: string, maxSizeMB: number): ScreenshotValidationResult {
-  const match = dataUrl.match(/^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/);
+  const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/);
   if (!match) {
     return {
       valid: false,
-      error: 'Invalid screenshot format. Expected a PNG data URL.',
+      error: 'Invalid screenshot format. Expected a PNG, JPEG, or WebP data URL.',
     };
   }
 
-  const base64 = match[1];
+  const contentType = match[1] as ScreenshotContentType;
+  const base64 = match[2];
   if (!base64) {
     return {
       valid: false,
-      error: 'Invalid screenshot format. Expected a PNG data URL.',
+      error: 'Invalid screenshot format. Expected a PNG, JPEG, or WebP data URL.',
     };
   }
 
@@ -421,14 +423,14 @@ function validateScreenshotDataUrl(dataUrl: string, maxSizeMB: number): Screensh
   } catch {
     return {
       valid: false,
-      error: 'Invalid screenshot format. Expected valid base64 PNG data.',
+      error: 'Invalid screenshot format. Expected valid base64 image data.',
     };
   }
 
-  if (!hasPngSignature(bytes)) {
+  if (!hasScreenshotSignature(bytes, contentType)) {
     return {
       valid: false,
-      error: 'Invalid screenshot format. Expected PNG image data.',
+      error: `Invalid screenshot format. Expected ${contentType} image data.`,
     };
   }
 
@@ -732,6 +734,25 @@ function base64ToBytes(base64: string): Uint8Array {
 function hasPngSignature(bytes: Uint8Array): boolean {
   if (bytes.length < PNG_SIGNATURE.length) return false;
   return PNG_SIGNATURE.every((byte, index) => bytes[index] === byte);
+}
+
+function hasScreenshotSignature(bytes: Uint8Array, contentType: ScreenshotContentType): boolean {
+  if (contentType === 'image/png') return hasPngSignature(bytes);
+  if (contentType === 'image/jpeg') {
+    return (
+      bytes.length >= 4 &&
+      bytes[0] === 0xff &&
+      bytes[1] === 0xd8 &&
+      bytes[2] === 0xff &&
+      bytes.at(-2) === 0xff &&
+      bytes.at(-1) === 0xd9
+    );
+  }
+  return (
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
+    String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'
+  );
 }
 
 /**

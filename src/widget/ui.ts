@@ -652,6 +652,135 @@ export function injectStyles(shadow: ShadowRoot, config: WidgetConfig) {
       padding-top: 3px;
     }
 
+    .bd-native-screenshot-control {
+      display: grid;
+      gap: 10px;
+      width: 100%;
+      padding: 12px;
+      border: var(--bd-border-style);
+      border-radius: var(--bd-radius-sm);
+      background: var(--bd-bg-secondary);
+    }
+
+    .bd-native-screenshot-title {
+      display: block;
+      color: var(--bd-text-primary);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .bd-native-screenshot-control p {
+      margin: 3px 0 0;
+      color: var(--bd-text-secondary);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .bd-native-screenshot-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .bd-native-screenshot-actions .bd-btn {
+      min-height: 36px;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .bd-native-screenshot-preview {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr) 32px;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .bd-native-screenshot-preview:empty {
+      display: none;
+    }
+
+    .bd-native-screenshot-image {
+      width: 52px;
+      height: 52px;
+      object-fit: cover;
+      border: var(--bd-border-style);
+      border-radius: var(--bd-radius-sm);
+      background: var(--bd-bg-tertiary);
+    }
+
+    .bd-native-screenshot-name {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--bd-text-primary);
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bd-screenshot-draft {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 1000001;
+      width: 56px;
+      height: 56px;
+    }
+
+    .bd-screenshot-draft--left {
+      right: auto;
+      left: 16px;
+    }
+
+    .bd-screenshot-draft-attach,
+    .bd-screenshot-draft-return {
+      display: grid;
+      place-items: center;
+      border: 0;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .bd-screenshot-draft-attach {
+      width: 56px;
+      height: 56px;
+      border-radius: 999px;
+      background: var(--bd-primary);
+      box-shadow: var(--bd-shadow-lg), var(--bd-shadow-glow);
+      color: var(--bd-primary-text);
+    }
+
+    .bd-screenshot-draft-attach:hover {
+      background: var(--bd-primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .bd-screenshot-draft-attach:focus-visible,
+    .bd-screenshot-draft-return:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--bd-primary) 35%, transparent);
+      outline-offset: 2px;
+    }
+
+    .bd-screenshot-draft-attach svg {
+      width: 25px;
+      height: 25px;
+    }
+
+    .bd-screenshot-draft-return {
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      width: 24px;
+      height: 24px;
+      border: var(--bd-border-style);
+      border-radius: 999px;
+      background: var(--bd-bg-primary);
+      box-shadow: var(--bd-shadow-sm);
+      color: var(--bd-text-secondary);
+      font-size: 18px;
+      line-height: 1;
+    }
+
     .bd-checkbox {
       width: 18px;
       height: 18px;
@@ -1229,8 +1358,26 @@ export function injectStyles(shadow: ShadowRoot, config: WidgetConfig) {
       }
 
       .bd-evidence-row {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: 1fr;
         gap: 8px;
+      }
+
+      .bd-native-screenshot-actions {
+        flex-direction: column;
+      }
+
+      .bd-native-screenshot-actions .bd-btn {
+        width: 100%;
+      }
+
+      .bd-screenshot-draft {
+        right: 12px;
+        bottom: 12px;
+      }
+
+      .bd-screenshot-draft--left {
+        right: auto;
+        left: 12px;
       }
 
       .bd-upload-button {

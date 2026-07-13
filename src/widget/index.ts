@@ -32,6 +32,18 @@ import {
 import { escapeWidgetText, resolveLocale, setLocale, t, type SupportedLocale } from './i18n';
 import { installRadixDialogCompatibility } from './radix-compat';
 import { resolveAccentColor } from '../defaults';
+import {
+  resolveFeedbackProvider,
+  resolveSubmissionUrl,
+  shouldCheckProviderInstallation,
+  type FeedbackProvider,
+} from './provider-config';
+import {
+  isNativeScreenshotCandidate,
+  MAX_NATIVE_SCREENSHOT_SOURCE_BYTES,
+  NATIVE_SCREENSHOT_ACCEPT,
+  normalizeNativeScreenshotFile,
+} from './native-screenshot';
 
 type FeedbackCategory = 'bug' | 'feature' | 'question';
 type CategoryLabelConfig = Partial<Record<FeedbackCategory, string | string[]>>;
@@ -45,6 +57,13 @@ type FeedbackAttachment = {
 interface WidgetConfig {
   repo: string;
   apiUrl: string;
+  submissionUrl: string;
+  provider: FeedbackProvider;
+  appVersion?: string;
+  environment?: string;
+  allowUploads: boolean;
+  allowConsoleLogs: boolean;
+  includePath: boolean;
   authTokenProvider?: BugDropAuthTokenProvider;
   position: 'bottom-right' | 'bottom-left';
   theme: 'light' | 'dark' | 'auto';
@@ -79,7 +98,7 @@ interface WidgetConfig {
   // Welcome screen behavior
   welcome: 'once' | 'always' | 'never';
   // Screenshot configuration
-  screenshotMode: 'optional' | 'auto' | 'required';
+  screenshotMode: 'never' | 'optional' | 'auto' | 'required' | 'upload';
   screenshotScale?: number; // Minimum pixel ratio for captures (default: 2)
   elementContextMaxArea?: number; // Max ancestor capture area as a viewport multiplier
   issueLinkVisibility: IssueLinkVisibility;
@@ -107,6 +126,7 @@ declare global {
 }
 
 interface FeedbackData {
+  submissionId: string;
   title: string;
   description: string;
   category: FeedbackCategory;
@@ -416,9 +436,21 @@ if (rawShowIssueLink && rawShowIssueLink !== 'public' && rawShowIssueLink !== is
     `[BugDrop] Invalid data-show-issue-link "${rawShowIssueLink}". Expected "public", "always", or "never".`
   );
 }
+const provider = resolveFeedbackProvider(script?.dataset.provider);
+const apiUrl =
+  script?.dataset.apiUrl?.trim() ||
+  script?.src.replace(/\/widget(?:\.v[\d.]+)?\.js$/, '/api') ||
+  '';
 const config: WidgetConfig = {
   repo: script?.dataset.repo || '',
-  apiUrl: script?.src.replace(/\/widget(?:\.v[\d.]+)?\.js$/, '/api') || '',
+  apiUrl,
+  submissionUrl: resolveSubmissionUrl(script?.dataset.submissionUrl, apiUrl),
+  provider,
+  appVersion: script?.dataset.appVersion?.trim() || undefined,
+  environment: script?.dataset.environment?.trim() || undefined,
+  allowUploads: script?.dataset.allowUploads !== 'false',
+  allowConsoleLogs: script?.dataset.allowConsoleLogs !== 'false',
+  includePath: script?.dataset.includePath !== 'false',
   authTokenProvider: resolveAuthTokenProvider(script?.dataset.authTokenProvider),
   position: rawPosition === 'bottom-left' ? 'bottom-left' : 'bottom-right',
   theme: isValidTheme(rawTheme) ? rawTheme : 'auto', // Default to auto-detection
@@ -460,10 +492,10 @@ const config: WidgetConfig = {
   // Screenshot configuration
   screenshotMode: (() => {
     const val = script?.dataset.screenshot;
-    if (val === 'auto' || val === 'required') return val;
+    if (val === 'never' || val === 'auto' || val === 'required' || val === 'upload') return val;
     if (val && val !== 'optional') {
       console.warn(
-        `[BugDrop] Invalid data-screenshot "${val}". Expected "optional", "auto", or "required".`
+        `[BugDrop] Invalid data-screenshot "${val}". Expected "never", "optional", "auto", "required", or "upload".`
       );
     }
     return 'optional' as const;
@@ -477,7 +509,7 @@ const config: WidgetConfig = {
 
 setLocale(config.locale);
 
-startConsoleLogCapture();
+if (config.allowConsoleLogs) startConsoleLogCapture();
 
 // Validate config
 if (!config.repo) {
@@ -794,12 +826,21 @@ function initWidget(config: WidgetConfig) {
   const shadow = host.attachShadow({ mode: 'open' });
   installRadixDialogCompatibility(host);
 
-  // Prevent keyboard events from leaking to host page (e.g., ERPNext console shortcuts)
+  // Prevent keyboard events from leaking to host page (e.g., ERPNext console shortcuts).
+  // stopImmediatePropagation also protects text entry from later listeners attached to the
+  // widget root that call preventDefault for application shortcuts.
   for (const eventType of ['keydown', 'keypress', 'keyup'] as const) {
     shadow.addEventListener(eventType, (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        e.stopPropagation();
+      const isTextEntry = e
+        .composedPath()
+        .some(
+          target =>
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            (target instanceof HTMLElement && target.isContentEditable)
+        );
+      if (isTextEntry) {
+        e.stopImmediatePropagation();
       }
     });
   }
@@ -905,10 +946,8 @@ function exposeBugDropAPI(root: HTMLElement, config: WidgetConfig) {
     close: () => {
       if (_isModalOpen) {
         // Find and remove any open modal
-        const modal = root.querySelector('.bd-modal');
-        if (modal) {
-          modal.remove();
-        }
+        root.querySelector('.bd-overlay')?.remove();
+        root.querySelector('.bd-screenshot-draft')?.remove();
         _isModalOpen = false;
       }
     },
@@ -1054,15 +1093,16 @@ async function openFeedbackFlow(
   // Mark modal as open
   _isModalOpen = true;
 
-  // Check if app is installed
-  const { status: installStatus, appName } = await checkInstallation(config);
-  if (installStatus === 'not_installed') {
-    showInstallPrompt(root, config, undefined, appName);
-    return;
-  }
-  if (installStatus === 'unreachable') {
-    showInstallPrompt(root, config, t().apiUnreachableMessage, appName);
-    return;
+  if (shouldCheckProviderInstallation(config.provider)) {
+    const { status: installStatus, appName } = await checkInstallation(config);
+    if (installStatus === 'not_installed') {
+      showInstallPrompt(root, config, undefined, appName);
+      return;
+    }
+    if (installStatus === 'unreachable') {
+      showInstallPrompt(root, config, t().apiUnreachableMessage, appName);
+      return;
+    }
   }
 
   // Step 1: Welcome screen (conditional)
@@ -1104,12 +1144,13 @@ async function openFeedbackFlow(
 
     // Submit
     await submitFeedback(root, config, {
+      submissionId: crypto.randomUUID(),
       title: formResult.title,
       description: formResult.description,
       category: formResult.category,
       name: formResult.name,
       email: formResult.email,
-      screenshot: screenshotResult.screenshot,
+      screenshot: formResult.uploadedScreenshot?.dataUrl ?? screenshotResult.screenshot,
       attachments: formResult.attachments,
       elementSelector: screenshotResult.elementSelector,
       fullElementSelector: screenshotResult.fullElementSelector,
@@ -1228,6 +1269,7 @@ interface FeedbackFormResult {
   name?: string;
   email?: string;
   includeScreenshot: boolean;
+  uploadedScreenshot: FeedbackAttachment | null;
   attachments: FeedbackAttachment[];
   sendConsoleLogs: boolean;
 }
@@ -1293,24 +1335,34 @@ function showFeedbackFormWithScreenshotOption(
           <div class="bd-evidence-block">
             <div class="bd-evidence-row">
               ${getScreenshotFormControl(config, initialValues)}
-              ${getUploadFormControl()}
+              ${config.allowUploads ? getUploadFormControl() : ''}
             </div>
-            <input type="file" id="attachment-upload" accept="${ACCEPTED_UPLOAD_TYPES.join(',')}" multiple class="bd-upload-input" />
-            <div id="attachment-list" class="bd-upload-list" aria-live="polite">${
-              initialValues?.attachments.length ? '' : ''
-            }</div>
-            <p id="attachment-error" class="bd-field-error" hidden></p>
-            ${getConsoleLogsFormControl(config, initialValues)}
+            ${
+              config.allowUploads
+                ? `<input type="file" id="attachment-upload" accept="${ACCEPTED_UPLOAD_TYPES.join(',')}" multiple class="bd-upload-input" />
+                   <div id="attachment-list" class="bd-upload-list" aria-live="polite"></div>
+                   <p id="attachment-error" class="bd-field-error" hidden></p>`
+                : ''
+            }
+            ${
+              config.screenshotMode === 'upload'
+                ? `<input type="file" id="screenshot-upload" accept="${NATIVE_SCREENSHOT_ACCEPT}" class="bd-upload-input" />
+                   <div id="screenshot-preview" class="bd-native-screenshot-preview" aria-live="polite"></div>
+                   <p id="screenshot-upload-error" class="bd-field-error" hidden></p>`
+                : ''
+            }
+            ${config.allowConsoleLogs ? getConsoleLogsFormControl(config, initialValues) : ''}
           </div>
           <div class="bd-actions">
             <button type="button" class="bd-btn bd-btn-secondary" data-action="cancel">${escapeWidgetText(t().cancel)}</button>
-            <button type="submit" class="bd-btn bd-btn-primary" id="submit-btn">${config.screenshotMode === 'auto' ? escapeWidgetText(t().submit) : escapeWidgetText(t().continueButton)}</button>
+            <button type="submit" class="bd-btn bd-btn-primary" id="submit-btn">${config.screenshotMode === 'auto' || config.screenshotMode === 'never' || config.screenshotMode === 'upload' ? escapeWidgetText(t().submit) : escapeWidgetText(t().continueButton)}</button>
           </div>
         </form>
       `
     );
 
     const form = modal.querySelector('#feedback-form') as HTMLFormElement;
+    const submitButton = modal.querySelector('#submit-btn') as HTMLButtonElement;
     const nameInput = modal.querySelector('#name') as HTMLInputElement | null;
     const emailInput = modal.querySelector('#email') as HTMLInputElement | null;
     const titleInput = modal.querySelector('#title') as HTMLInputElement;
@@ -1318,16 +1370,67 @@ function showFeedbackFormWithScreenshotOption(
     const screenshotCheckbox = modal.querySelector(
       '#include-screenshot'
     ) as HTMLInputElement | null;
-    const uploadInput = modal.querySelector('#attachment-upload') as HTMLInputElement;
-    const uploadButton = modal.querySelector('[data-action="choose-uploads"]') as HTMLButtonElement;
-    const uploadList = modal.querySelector('#attachment-list') as HTMLElement;
-    const uploadError = modal.querySelector('#attachment-error') as HTMLElement;
-    const consoleLogsCheckbox = modal.querySelector('#send-console-logs') as HTMLInputElement;
+    const uploadInput = modal.querySelector('#attachment-upload') as HTMLInputElement | null;
+    const uploadButton = modal.querySelector(
+      '[data-action="choose-uploads"]'
+    ) as HTMLButtonElement | null;
+    const uploadList = modal.querySelector('#attachment-list') as HTMLElement | null;
+    const uploadError = modal.querySelector('#attachment-error') as HTMLElement | null;
+    const screenshotInput = modal.querySelector('#screenshot-upload') as HTMLInputElement | null;
+    const screenshotPreview = modal.querySelector('#screenshot-preview') as HTMLElement | null;
+    const screenshotError = modal.querySelector('#screenshot-upload-error') as HTMLElement | null;
+    const minimizeForScreenshot = modal.querySelector(
+      '[data-action="minimize-for-screenshot"]'
+    ) as HTMLButtonElement | null;
+    const chooseScreenshot = modal.querySelector(
+      '[data-action="choose-screenshot"]'
+    ) as HTMLButtonElement | null;
+    const consoleLogsCheckbox = modal.querySelector(
+      '#send-console-logs'
+    ) as HTMLInputElement | null;
     const closeBtn = modal.querySelector('.bd-close') as HTMLElement;
     const cancelBtn = modal.querySelector('[data-action="cancel"]') as HTMLElement;
-    let attachments = [...(initialValues?.attachments ?? [])];
+    let attachments = config.allowUploads ? [...(initialValues?.attachments ?? [])] : [];
+    let uploadedScreenshot =
+      config.screenshotMode === 'upload' ? (initialValues?.uploadedScreenshot ?? null) : null;
+    let screenshotDraft: HTMLElement | null = null;
+    let screenshotReadPromise: Promise<void> | null = null;
+
+    const cleanupScreenshotDraft = () => {
+      screenshotDraft?.remove();
+      screenshotDraft = null;
+    };
+
+    const restoreReport = (focusTarget?: HTMLElement | null) => {
+      cleanupScreenshotDraft();
+      modal.style.display = '';
+      focusTarget?.focus();
+    };
+
+    const openScreenshotPicker = () => screenshotInput?.click();
+
+    const renderUploadedScreenshot = () => {
+      if (!screenshotPreview) return;
+      renderNativeScreenshotPreview(screenshotPreview, uploadedScreenshot, () => {
+        uploadedScreenshot = null;
+        renderUploadedScreenshot();
+        chooseScreenshot?.focus();
+      });
+    };
+
+    const minimizeReport = () => {
+      if (!screenshotInput) return;
+      cleanupScreenshotDraft();
+      modal.style.display = 'none';
+      screenshotDraft = createNativeScreenshotDraft(config, openScreenshotPicker, () =>
+        restoreReport(minimizeForScreenshot)
+      );
+      root.appendChild(screenshotDraft);
+      screenshotDraft.querySelector<HTMLButtonElement>('.bd-screenshot-draft-attach')?.focus();
+    };
 
     const closeModal = () => {
+      cleanupScreenshotDraft();
       modal.remove();
       resolve(null);
     };
@@ -1335,8 +1438,9 @@ function showFeedbackFormWithScreenshotOption(
     closeBtn?.addEventListener('click', closeModal);
     cancelBtn?.addEventListener('click', closeModal);
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
+      await screenshotReadPromise;
 
       // Validate required fields
       if (!titleInput.value.trim()) {
@@ -1365,11 +1469,16 @@ function showFeedbackFormWithScreenshotOption(
       ) as HTMLInputElement;
       const category = (categoryInput?.value || 'bug') as FeedbackCategory;
       const includeScreenshot =
-        config.screenshotMode === 'optional' ? (screenshotCheckbox?.checked ?? false) : true;
+        config.screenshotMode === 'never' || config.screenshotMode === 'upload'
+          ? false
+          : config.screenshotMode === 'optional'
+            ? (screenshotCheckbox?.checked ?? false)
+            : true;
       if (config.screenshotMode === 'optional' && includeScreenshot) {
         clearComplexScreenshotsSkipped(config.repo);
       }
 
+      cleanupScreenshotDraft();
       modal.remove();
       resolve({
         title: titleInput.value.trim(),
@@ -1378,8 +1487,9 @@ function showFeedbackFormWithScreenshotOption(
         name: nameInput?.value.trim() || undefined,
         email: emailInput?.value.trim() || undefined,
         includeScreenshot,
+        uploadedScreenshot,
         attachments,
-        sendConsoleLogs: consoleLogsCheckbox.checked,
+        sendConsoleLogs: config.allowConsoleLogs && Boolean(consoleLogsCheckbox?.checked),
       });
     });
 
@@ -1389,16 +1499,18 @@ function showFeedbackFormWithScreenshotOption(
     emailInput?.addEventListener('input', () => emailInput.classList.remove('bd-input--error'));
 
     const rerenderUploads = () => {
+      if (!uploadList) return;
       renderUploadList(uploadList, attachments, index => {
         attachments = attachments.filter((_, itemIndex) => itemIndex !== index);
         rerenderUploads();
       });
     };
 
-    uploadButton.addEventListener('click', () => uploadInput.click());
-    uploadInput.addEventListener('change', async () => {
+    uploadButton?.addEventListener('click', () => uploadInput?.click());
+    uploadInput?.addEventListener('change', async () => {
       const files = Array.from(uploadInput.files ?? []);
       uploadInput.value = '';
+      if (!uploadError) return;
       uploadError.textContent = '';
       uploadError.hidden = true;
 
@@ -1425,7 +1537,60 @@ function showFeedbackFormWithScreenshotOption(
       }
     });
 
+    minimizeForScreenshot?.addEventListener('click', minimizeReport);
+    chooseScreenshot?.addEventListener('click', openScreenshotPicker);
+    screenshotInput?.addEventListener('change', () => {
+      const file = screenshotInput.files?.[0];
+      screenshotInput.value = '';
+      if (!file || !screenshotError) return;
+      screenshotError.textContent = '';
+      screenshotError.hidden = true;
+
+      const validationError = validateNativeScreenshotFile(file);
+      if (validationError) {
+        restoreReport(chooseScreenshot);
+        showUploadError(screenshotError, validationError);
+        return;
+      }
+
+      submitButton.disabled = true;
+      minimizeForScreenshot?.setAttribute('disabled', '');
+      chooseScreenshot?.setAttribute('disabled', '');
+      screenshotInput.disabled = true;
+      screenshotDraft?.querySelectorAll('button').forEach(button => {
+        (button as HTMLButtonElement).disabled = true;
+      });
+      form.setAttribute('aria-busy', 'true');
+      let focusAfterRead: HTMLElement | null = null;
+      const readPromise = (async () => {
+        try {
+          const normalizedFile = await normalizeNativeScreenshotFile(file);
+          const screenshot = await fileToAttachment(normalizedFile);
+          await verifyImageDataUrl(screenshot.dataUrl);
+          uploadedScreenshot = screenshot;
+          restoreReport(chooseScreenshot);
+          renderUploadedScreenshot();
+          screenshotPreview?.querySelector<HTMLButtonElement>('.bd-upload-remove')?.focus();
+        } catch {
+          restoreReport();
+          focusAfterRead = chooseScreenshot;
+          showUploadError(screenshotError, t().screenshotReadError);
+        }
+      })();
+      screenshotReadPromise = readPromise;
+      void readPromise.finally(() => {
+        if (screenshotReadPromise === readPromise) screenshotReadPromise = null;
+        submitButton.disabled = false;
+        minimizeForScreenshot?.removeAttribute('disabled');
+        chooseScreenshot?.removeAttribute('disabled');
+        screenshotInput.disabled = false;
+        form.removeAttribute('aria-busy');
+        focusAfterRead?.focus();
+      });
+    });
+
     rerenderUploads();
+    renderUploadedScreenshot();
   });
 }
 
@@ -1454,6 +1619,73 @@ function validateUploadFile(file: File): string | null {
     return t().uploadTooLarge(formatFileSize(MAX_UPLOAD_SIZE_BYTES));
   }
   return null;
+}
+
+function validateNativeScreenshotFile(file: File): string | null {
+  if (!isNativeScreenshotCandidate(file)) {
+    return t().screenshotUnsupportedType;
+  }
+  if (file.size <= 0 || file.size > MAX_NATIVE_SCREENSHOT_SOURCE_BYTES) {
+    return t().screenshotTooLarge(formatFileSize(MAX_NATIVE_SCREENSHOT_SOURCE_BYTES));
+  }
+  return null;
+}
+
+function renderNativeScreenshotPreview(
+  target: HTMLElement,
+  screenshot: FeedbackAttachment | null,
+  onRemove: () => void
+): void {
+  target.replaceChildren();
+  if (!screenshot) return;
+
+  const image = document.createElement('img');
+  image.className = 'bd-native-screenshot-image';
+  image.src = screenshot.dataUrl;
+  image.alt = '';
+
+  const name = document.createElement('span');
+  name.className = 'bd-native-screenshot-name';
+  name.textContent = screenshot.name;
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'bd-upload-remove';
+  remove.setAttribute('aria-label', t().removeScreenshotAriaLabel);
+  remove.textContent = '×';
+  remove.addEventListener('click', onRemove);
+
+  target.append(image, name, remove);
+}
+
+function createNativeScreenshotDraft(
+  config: WidgetConfig,
+  onAttach: () => void,
+  onReturn: () => void
+): HTMLElement {
+  const draft = document.createElement('section');
+  draft.className = 'bd-screenshot-draft';
+  if (config.position === 'bottom-left') draft.classList.add('bd-screenshot-draft--left');
+  draft.setAttribute('aria-label', t().screenshotDraftHint);
+  const attach = document.createElement('button');
+  attach.type = 'button';
+  attach.className = 'bd-screenshot-draft-attach';
+  attach.setAttribute('aria-label', t().attachScreenshot);
+  attach.title = t().attachScreenshot;
+  attach.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M14.5 6.5 8 13a3 3 0 0 0 4.25 4.25l7-7a5 5 0 0 0-7.07-7.07l-7.5 7.5a7 7 0 0 0 9.9 9.9L21 14" />
+    </svg>`;
+  attach.addEventListener('click', onAttach);
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'bd-screenshot-draft-return';
+  back.setAttribute('aria-label', t().returnToReport);
+  back.title = t().returnToReport;
+  back.textContent = '×';
+  back.addEventListener('click', onReturn);
+  draft.append(attach, back);
+  return draft;
 }
 
 function showUploadError(target: HTMLElement, message: string) {
@@ -1506,6 +1738,18 @@ function fileToAttachment(file: File): Promise<FeedbackAttachment> {
   });
 }
 
+function verifyImageDataUrl(dataUrl: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => {
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) resolve();
+      else reject(new Error('Image has no visible dimensions.'));
+    });
+    image.addEventListener('error', () => reject(new Error('Could not decode image.')));
+    image.src = dataUrl;
+  });
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -1516,6 +1760,10 @@ function getScreenshotFormControl(
   config: WidgetConfig,
   initialValues?: FeedbackFormResult | null
 ): string {
+  if (config.screenshotMode === 'never') {
+    return '';
+  }
+
   if (config.screenshotMode === 'auto') {
     const redactionNote =
       getRedactionCount() > 0 ? ` ${escapeWidgetText(t().screenshotAutoRedactionNote)}` : '';
@@ -1523,6 +1771,21 @@ function getScreenshotFormControl(
       <p style="margin: 8px 0 0; color: var(--bd-text-secondary); font-size: 0.95rem;">
         ${escapeWidgetText(t().screenshotAutoNote)}${redactionNote}
       </p>
+    `;
+  }
+
+  if (config.screenshotMode === 'upload') {
+    return `
+      <div class="bd-native-screenshot-control">
+        <div>
+          <span class="bd-native-screenshot-title">${escapeWidgetText(t().screenshotUploadTitle)}</span>
+          <p>${escapeWidgetText(t().screenshotUploadHint)}</p>
+        </div>
+        <div class="bd-native-screenshot-actions">
+          <button type="button" class="bd-btn bd-btn-secondary" data-action="minimize-for-screenshot">${escapeWidgetText(t().takeScreenshot)}</button>
+          <button type="button" class="bd-btn bd-btn-quiet" data-action="choose-screenshot">${escapeWidgetText(t().chooseExistingScreenshot)}</button>
+        </div>
+      </div>
     `;
   }
 
@@ -1595,13 +1858,14 @@ async function submitFeedback(root: HTMLElement, config: WidgetConfig, data: Fee
       ? getConsoleLogSnapshot()
       : undefined;
 
-    const response = await fetch(`${config.apiUrl}/feedback`, {
+    const response = await fetch(config.submissionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(await getAuthHeaders(config.authTokenProvider)),
       },
       body: JSON.stringify({
+        submissionId: data.submissionId,
         repo: config.repo,
         title: data.title,
         description: data.description,
@@ -1612,7 +1876,7 @@ async function submitFeedback(root: HTMLElement, config: WidgetConfig, data: Fee
         consoleLogs,
         submitter,
         metadata: {
-          url: systemInfo.url, // Redacted URL (no query params)
+          url: config.includePath ? systemInfo.url : window.location.origin,
           userAgent: navigator.userAgent,
           viewport: {
             width: window.innerWidth,
@@ -1629,6 +1893,8 @@ async function submitFeedback(root: HTMLElement, config: WidgetConfig, data: Fee
           os: systemInfo.os,
           devicePixelRatio: systemInfo.devicePixelRatio,
           language: systemInfo.language,
+          appVersion: config.appVersion,
+          environment: config.environment,
         },
       }),
     });

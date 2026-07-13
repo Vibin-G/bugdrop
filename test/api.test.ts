@@ -1298,6 +1298,28 @@ describe('API Routes', () => {
       );
     });
 
+    it('should accept a normalized JPEG screenshot', async () => {
+      const jpegDataUrl = 'data:image/jpeg;base64,/9j/2Q==';
+      mockUploadScreenshotAsAsset.mockResolvedValue(
+        'https://raw.githubusercontent.com/testowner/testrepo/main/.bugdrop/screenshots/123456.jpg'
+      );
+
+      const req = new Request('http://localhost/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...validPayload, screenshot: jpegDataUrl }),
+      });
+      const res = await app.fetch(req, mockEnv);
+
+      expect(res.status).toBe(200);
+      expect(mockUploadScreenshotAsAsset).toHaveBeenCalledWith(
+        'test-token',
+        'testowner',
+        'testrepo',
+        jpegDataUrl
+      );
+    });
+
     it('should upload selected files and include attachment links in issue body', async () => {
       const uploadedImageUrl =
         'https://raw.githubusercontent.com/testowner/testrepo/main/.bugdrop/uploads/photo.png';
@@ -1569,7 +1591,7 @@ describe('API Routes', () => {
       const data = await res.json();
 
       expect(res.status).toBe(400);
-      expect(data.error).toContain('Expected a PNG data URL');
+      expect(data.error).toContain('Expected a PNG, JPEG, or WebP data URL');
       expect(mockUploadScreenshotAsAsset).not.toHaveBeenCalled();
     });
 
@@ -1586,7 +1608,7 @@ describe('API Routes', () => {
       const data = await res.json();
 
       expect(res.status).toBe(400);
-      expect(data.error).toContain('Expected a PNG data URL');
+      expect(data.error).toContain('Expected a PNG, JPEG, or WebP data URL');
       expect(mockUploadScreenshotAsAsset).not.toHaveBeenCalled();
     });
 
@@ -1603,7 +1625,7 @@ describe('API Routes', () => {
       const data = await res.json();
 
       expect(res.status).toBe(400);
-      expect(data.error).toContain('Expected PNG image data');
+      expect(data.error).toContain('Expected image/png image data');
       expect(mockUploadScreenshotAsAsset).not.toHaveBeenCalled();
     });
 
