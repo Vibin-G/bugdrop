@@ -32,6 +32,12 @@ import {
 import { escapeWidgetText, resolveLocale, setLocale, t, type SupportedLocale } from './i18n';
 import { installRadixDialogCompatibility } from './radix-compat';
 import { resolveAccentColor } from '../defaults';
+import {
+  resolveFeedbackProvider,
+  resolveSubmissionUrl,
+  shouldCheckProviderInstallation,
+  type FeedbackProvider,
+} from './provider-config';
 
 type FeedbackCategory = 'bug' | 'feature' | 'question';
 type CategoryLabelConfig = Partial<Record<FeedbackCategory, string | string[]>>;
@@ -45,6 +51,13 @@ type FeedbackAttachment = {
 interface WidgetConfig {
   repo: string;
   apiUrl: string;
+  submissionUrl: string;
+  provider: FeedbackProvider;
+  appVersion?: string;
+  environment?: string;
+  allowUploads: boolean;
+  allowConsoleLogs: boolean;
+  includePath: boolean;
   authTokenProvider?: BugDropAuthTokenProvider;
   position: 'bottom-right' | 'bottom-left';
   theme: 'light' | 'dark' | 'auto';
@@ -416,9 +429,21 @@ if (rawShowIssueLink && rawShowIssueLink !== 'public' && rawShowIssueLink !== is
     `[BugDrop] Invalid data-show-issue-link "${rawShowIssueLink}". Expected "public", "always", or "never".`
   );
 }
+const provider = resolveFeedbackProvider(script?.dataset.provider);
+const apiUrl =
+  script?.dataset.apiUrl?.trim() ||
+  script?.src.replace(/\/widget(?:\.v[\d.]+)?\.js$/, '/api') ||
+  '';
 const config: WidgetConfig = {
   repo: script?.dataset.repo || '',
-  apiUrl: script?.src.replace(/\/widget(?:\.v[\d.]+)?\.js$/, '/api') || '',
+  apiUrl,
+  submissionUrl: resolveSubmissionUrl(script?.dataset.submissionUrl, apiUrl),
+  provider,
+  appVersion: script?.dataset.appVersion?.trim() || undefined,
+  environment: script?.dataset.environment?.trim() || undefined,
+  allowUploads: script?.dataset.allowUploads !== 'false',
+  allowConsoleLogs: script?.dataset.allowConsoleLogs !== 'false',
+  includePath: script?.dataset.includePath !== 'false',
   authTokenProvider: resolveAuthTokenProvider(script?.dataset.authTokenProvider),
   position: rawPosition === 'bottom-left' ? 'bottom-left' : 'bottom-right',
   theme: isValidTheme(rawTheme) ? rawTheme : 'auto', // Default to auto-detection
@@ -477,7 +502,7 @@ const config: WidgetConfig = {
 
 setLocale(config.locale);
 
-startConsoleLogCapture();
+if (config.allowConsoleLogs) startConsoleLogCapture();
 
 // Validate config
 if (!config.repo) {
@@ -1054,15 +1079,16 @@ async function openFeedbackFlow(
   // Mark modal as open
   _isModalOpen = true;
 
-  // Check if app is installed
-  const { status: installStatus, appName } = await checkInstallation(config);
-  if (installStatus === 'not_installed') {
-    showInstallPrompt(root, config, undefined, appName);
-    return;
-  }
-  if (installStatus === 'unreachable') {
-    showInstallPrompt(root, config, t().apiUnreachableMessage, appName);
-    return;
+  if (shouldCheckProviderInstallation(config.provider)) {
+    const { status: installStatus, appName } = await checkInstallation(config);
+    if (installStatus === 'not_installed') {
+      showInstallPrompt(root, config, undefined, appName);
+      return;
+    }
+    if (installStatus === 'unreachable') {
+      showInstallPrompt(root, config, t().apiUnreachableMessage, appName);
+      return;
+    }
   }
 
   // Step 1: Welcome screen (conditional)
@@ -1293,14 +1319,16 @@ function showFeedbackFormWithScreenshotOption(
           <div class="bd-evidence-block">
             <div class="bd-evidence-row">
               ${getScreenshotFormControl(config, initialValues)}
-              ${getUploadFormControl()}
+              ${config.allowUploads ? getUploadFormControl() : ''}
             </div>
-            <input type="file" id="attachment-upload" accept="${ACCEPTED_UPLOAD_TYPES.join(',')}" multiple class="bd-upload-input" />
-            <div id="attachment-list" class="bd-upload-list" aria-live="polite">${
-              initialValues?.attachments.length ? '' : ''
-            }</div>
-            <p id="attachment-error" class="bd-field-error" hidden></p>
-            ${getConsoleLogsFormControl(config, initialValues)}
+            ${
+              config.allowUploads
+                ? `<input type="file" id="attachment-upload" accept="${ACCEPTED_UPLOAD_TYPES.join(',')}" multiple class="bd-upload-input" />
+                   <div id="attachment-list" class="bd-upload-list" aria-live="polite"></div>
+                   <p id="attachment-error" class="bd-field-error" hidden></p>`
+                : ''
+            }
+            ${config.allowConsoleLogs ? getConsoleLogsFormControl(config, initialValues) : ''}
           </div>
           <div class="bd-actions">
             <button type="button" class="bd-btn bd-btn-secondary" data-action="cancel">${escapeWidgetText(t().cancel)}</button>
@@ -1318,14 +1346,18 @@ function showFeedbackFormWithScreenshotOption(
     const screenshotCheckbox = modal.querySelector(
       '#include-screenshot'
     ) as HTMLInputElement | null;
-    const uploadInput = modal.querySelector('#attachment-upload') as HTMLInputElement;
-    const uploadButton = modal.querySelector('[data-action="choose-uploads"]') as HTMLButtonElement;
-    const uploadList = modal.querySelector('#attachment-list') as HTMLElement;
-    const uploadError = modal.querySelector('#attachment-error') as HTMLElement;
-    const consoleLogsCheckbox = modal.querySelector('#send-console-logs') as HTMLInputElement;
+    const uploadInput = modal.querySelector('#attachment-upload') as HTMLInputElement | null;
+    const uploadButton = modal.querySelector(
+      '[data-action="choose-uploads"]'
+    ) as HTMLButtonElement | null;
+    const uploadList = modal.querySelector('#attachment-list') as HTMLElement | null;
+    const uploadError = modal.querySelector('#attachment-error') as HTMLElement | null;
+    const consoleLogsCheckbox = modal.querySelector(
+      '#send-console-logs'
+    ) as HTMLInputElement | null;
     const closeBtn = modal.querySelector('.bd-close') as HTMLElement;
     const cancelBtn = modal.querySelector('[data-action="cancel"]') as HTMLElement;
-    let attachments = [...(initialValues?.attachments ?? [])];
+    let attachments = config.allowUploads ? [...(initialValues?.attachments ?? [])] : [];
 
     const closeModal = () => {
       modal.remove();
@@ -1379,7 +1411,7 @@ function showFeedbackFormWithScreenshotOption(
         email: emailInput?.value.trim() || undefined,
         includeScreenshot,
         attachments,
-        sendConsoleLogs: consoleLogsCheckbox.checked,
+        sendConsoleLogs: config.allowConsoleLogs && Boolean(consoleLogsCheckbox?.checked),
       });
     });
 
@@ -1389,16 +1421,18 @@ function showFeedbackFormWithScreenshotOption(
     emailInput?.addEventListener('input', () => emailInput.classList.remove('bd-input--error'));
 
     const rerenderUploads = () => {
+      if (!uploadList) return;
       renderUploadList(uploadList, attachments, index => {
         attachments = attachments.filter((_, itemIndex) => itemIndex !== index);
         rerenderUploads();
       });
     };
 
-    uploadButton.addEventListener('click', () => uploadInput.click());
-    uploadInput.addEventListener('change', async () => {
+    uploadButton?.addEventListener('click', () => uploadInput?.click());
+    uploadInput?.addEventListener('change', async () => {
       const files = Array.from(uploadInput.files ?? []);
       uploadInput.value = '';
+      if (!uploadError) return;
       uploadError.textContent = '';
       uploadError.hidden = true;
 
@@ -1595,7 +1629,7 @@ async function submitFeedback(root: HTMLElement, config: WidgetConfig, data: Fee
       ? getConsoleLogSnapshot()
       : undefined;
 
-    const response = await fetch(`${config.apiUrl}/feedback`, {
+    const response = await fetch(config.submissionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1612,7 +1646,7 @@ async function submitFeedback(root: HTMLElement, config: WidgetConfig, data: Fee
         consoleLogs,
         submitter,
         metadata: {
-          url: systemInfo.url, // Redacted URL (no query params)
+          url: config.includePath ? systemInfo.url : window.location.origin,
           userAgent: navigator.userAgent,
           viewport: {
             width: window.innerWidth,
@@ -1629,6 +1663,8 @@ async function submitFeedback(root: HTMLElement, config: WidgetConfig, data: Fee
           os: systemInfo.os,
           devicePixelRatio: systemInfo.devicePixelRatio,
           language: systemInfo.language,
+          appVersion: config.appVersion,
+          environment: config.environment,
         },
       }),
     });
