@@ -5653,6 +5653,7 @@ test.describe('Screenshot Mode Configuration', () => {
     });
 
     await expect(host.locator('css=#submit-btn')).toBeDisabled();
+    await expect(host.locator('css=[data-action="choose-screenshot"]')).toBeDisabled();
     await host.locator('css=#submit-btn').click();
     await expect(host.locator('css=.bd-success-icon')).toBeVisible({ timeout: 10000 });
     expect(getPayload()?.screenshot).toBe(STUB_PNG);

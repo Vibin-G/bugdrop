@@ -1545,6 +1545,12 @@ function showFeedbackFormWithScreenshotOption(
       }
 
       submitButton.disabled = true;
+      minimizeForScreenshot?.setAttribute('disabled', '');
+      chooseScreenshot?.setAttribute('disabled', '');
+      screenshotInput.disabled = true;
+      screenshotDraft?.querySelectorAll('button').forEach(button => {
+        (button as HTMLButtonElement).disabled = true;
+      });
       form.setAttribute('aria-busy', 'true');
       const readPromise = (async () => {
         try {
@@ -1562,6 +1568,9 @@ function showFeedbackFormWithScreenshotOption(
       void readPromise.finally(() => {
         if (screenshotReadPromise === readPromise) screenshotReadPromise = null;
         submitButton.disabled = false;
+        minimizeForScreenshot?.removeAttribute('disabled');
+        chooseScreenshot?.removeAttribute('disabled');
+        screenshotInput.disabled = false;
         form.removeAttribute('aria-busy');
       });
     });
