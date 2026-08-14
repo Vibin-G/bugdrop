@@ -1,0 +1,701 @@
+<title>Frame by WanderCalm</title>
+<style>
+  /* ============ TOKENS — dark-first; the product lives in a dim room ============ */
+  :root {
+    --ground:      #0B0E13;
+    --surface:     #141922;
+    --surface-2:   #1C222D;
+    --line:        #2A323F;
+    --line-soft:   #202733;
+    --text:        #E9EBEF;
+    --text-mid:    #A3ADBC;
+    --text-dim:    #6E7987;
+    --amber:       #F0A868;
+    --amber-deep:  #C97F3E;
+    --teal:        #5E9EA0;
+    --rose:        #D2685E;
+    --glow:        rgba(240,168,104,.55);
+    --code-bg:     #10151D;
+    --shadow:      0 1px 2px rgba(0,0,0,.5), 0 8px 28px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ground:     #F4F6F8;
+      --surface:    #FFFFFF;
+      --surface-2:  #EDF0F4;
+      --line:       #D3DAE3;
+      --line-soft:  #E2E7ED;
+      --text:       #161B22;
+      --text-mid:   #4B5563;
+      --text-dim:   #7B8694;
+      --amber:      #A9631F;
+      --amber-deep: #8A4E15;
+      --teal:       #3C7477;
+      --rose:       #A8443A;
+      --glow:       rgba(169,99,31,.30);
+      --code-bg:    #F0F3F7;
+      --shadow:     0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.08);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground:     #F4F6F8;
+    --surface:    #FFFFFF;
+    --surface-2:  #EDF0F4;
+    --line:       #D3DAE3;
+    --line-soft:  #E2E7ED;
+    --text:       #161B22;
+    --text-mid:   #4B5563;
+    --text-dim:   #7B8694;
+    --amber:      #A9631F;
+    --amber-deep: #8A4E15;
+    --teal:       #3C7477;
+    --rose:       #A8443A;
+    --glow:       rgba(169,99,31,.30);
+    --code-bg:    #F0F3F7;
+    --shadow:     0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.08);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 24px 120px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 780px; margin: 0 auto; }
+  .wide { max-width: 1040px; margin: 0 auto; }
+
+  /* ============ TYPE ============ */
+  h1, h2, h3 { font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; font-weight: 600; text-wrap: balance; letter-spacing: -0.01em; }
+  h1 { font-size: clamp(2.1rem, 5.2vw, 3.1rem); line-height: 1.12; margin: 0 0 18px; }
+  h2 { font-size: clamp(1.5rem, 3.2vw, 1.95rem); line-height: 1.2; margin: 0 0 14px; }
+  h3 { font-size: 1.12rem; line-height: 1.3; margin: 0 0 8px; font-weight: 600; }
+  p { margin: 0 0 18px; }
+  a { color: var(--amber); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 3px; }
+  strong { font-weight: 650; color: var(--text); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .855em; background: var(--code-bg); border: 1px solid var(--line-soft);
+    padding: .1em .38em; border-radius: 4px; white-space: nowrap;
+  }
+
+  .eyebrow {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .69rem; text-transform: uppercase; letter-spacing: .16em;
+    color: var(--text-dim); margin: 0 0 10px;
+  }
+  .lede { font-size: 1.16rem; line-height: 1.6; color: var(--text-mid); }
+
+  section { padding-top: 64px; }
+  .rule { height: 1px; background: var(--line-soft); border: 0; margin: 0; }
+
+  /* ============ HERO ============ */
+  header { padding: 72px 0 0; }
+  .brandmark {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .7rem; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 26px;
+  }
+  .brandmark::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--amber); box-shadow: 0 0 10px var(--glow);
+  }
+
+  /* ============ THE DEVICE / LIVE PROTOTYPE ============ */
+  .stage { margin: 34px 0 0; }
+  .bezel {
+    position: relative; border-radius: 14px; padding: 11px;
+    background: linear-gradient(160deg, #23282F, #0E1116);
+    box-shadow: 0 2px 3px rgba(0,0,0,.5), 0 26px 60px rgba(0,0,0,.45);
+  }
+  .screen {
+    position: relative; aspect-ratio: 16 / 9; border-radius: 5px;
+    overflow: hidden; background: #05070A; isolation: isolate;
+  }
+
+  .plate { position: absolute; inset: 0; opacity: 0; }
+  .plate.on { opacity: 1; }
+  .plate .img {
+    position: absolute; inset: 0; background-size: cover; background-position: center;
+    transform: scale(1.05);
+  }
+  .plate.on .img { animation: kb 26s linear forwards; }
+  @keyframes kb {
+    from { transform: scale(1.045) translate(0,0); }
+    to   { transform: scale(1.135) translate(-1.4%, -1%); }
+  }
+  .grain {
+    position: absolute; inset: 0; pointer-events: none; opacity: .16; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+  }
+  /* corner scrims keep the overlay text legible on any photograph */
+  .scrim-tl, .scrim-bl {
+    position: absolute; pointer-events: none;
+  }
+  .scrim-tl { top: 0; left: 0; width: 62%; height: 52%;
+    background: linear-gradient(145deg, rgba(0,0,0,.72), rgba(0,0,0,0) 72%); }
+  .scrim-bl { bottom: 0; left: 0; right: 0; height: 42%;
+    background: linear-gradient(0deg, rgba(0,0,0,.68), rgba(0,0,0,0)); }
+
+  .hud-clock {
+    position: absolute; top: 5.2%; left: 4.2%; z-index: 3;
+    transition: opacity .9s ease;
+  }
+  .segs { display: flex; align-items: flex-start; gap: 4px; }
+  .segs svg { display: block; height: clamp(30px, 6.6vw, 58px); width: auto; }
+  .seg-off { fill: #FFFFFF; opacity: .085; }
+  .seg-on  { fill: #FFF3E2; opacity: .97; filter: drop-shadow(0 0 5px rgba(255,196,128,.75)); }
+  .colon { width: clamp(7px, 1.5vw, 13px); position: relative; align-self: stretch; }
+  .colon i {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    width: clamp(4px,.85vw,7px); aspect-ratio: 1; border-radius: 50%;
+    background: #FFF3E2; box-shadow: 0 0 6px rgba(255,196,128,.8);
+    transition: opacity .18s ease;
+  }
+  .colon i:first-child { top: 26%; }
+  .colon i:last-child  { top: 60%; }
+  .colon.dim i { opacity: .13; }
+  .meridiem {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: clamp(8px, 1.3vw, 12px); letter-spacing: .1em; color: #FFF3E2;
+    opacity: .82; align-self: flex-start; margin-top: 2px;
+  }
+  /* the date, subscripted beneath the time */
+  .hud-date {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: clamp(8.5px, 1.42vw, 13px); letter-spacing: .19em; text-transform: uppercase;
+    color: #FFF3E2; opacity: .62; margin-top: 7px; padding-left: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hud-caption {
+    position: absolute; left: 4.2%; bottom: 6.5%; z-index: 3; max-width: 74%;
+    transition: opacity .7s ease, transform .7s ease;
+  }
+  .hud-caption.hide { opacity: 0; transform: translateY(6px); }
+  .cap-main {
+    font-family: Georgia, "Iowan Old Style", serif;
+    font-size: clamp(15px, 2.5vw, 25px); color: #FFFFFF; line-height: 1.2;
+    text-shadow: 0 1px 14px rgba(0,0,0,.65);
+  }
+  .cap-sub {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: clamp(8.5px, 1.35vw, 12px); letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(255,255,255,.72); margin-top: 6px;
+  }
+  .screen.night .hud-caption { opacity: 0; }
+  .screen.night .plate { opacity: 0 !important; }
+  .screen.night .hud-clock { opacity: .30; }
+  .screen.night { background: #000; }
+
+  /* controls under the device */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin-top: 16px;
+  }
+  .btn {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
+    background: var(--surface); color: var(--text-mid);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px 13px; cursor: pointer; transition: .16s;
+  }
+  .btn:hover { color: var(--text); border-color: var(--amber); }
+  .btn[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: #12161C; }
+  .caption-note { font-size: .84rem; color: var(--text-dim); margin: 12px 0 0; }
+
+  /* ============ CALLOUT ============ */
+  .callout {
+    border: 1px solid var(--line); border-left: 3px solid var(--amber);
+    background: var(--surface); border-radius: 0 8px 8px 0;
+    padding: 20px 22px; margin: 0 0 22px;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout.warn { border-left-color: var(--rose); }
+
+  /* ============ TABLES ============ */
+  .tscroll { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; min-width: 620px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .67rem; text-transform: uppercase; letter-spacing: .11em;
+    color: var(--text-dim); font-weight: 500; background: var(--surface-2);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  .yes { color: var(--teal); font-weight: 650; }
+  .no  { color: var(--rose); font-weight: 650; }
+
+  /* ============ PHASE LIST (a real sequence, so it's numbered) ============ */
+  .phases { display: grid; gap: 2px; background: var(--line-soft); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .phase { background: var(--surface); padding: 18px 20px; display: grid; grid-template-columns: 46px 1fr; gap: 16px; }
+  .phase .n {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .72rem; color: var(--amber); letter-spacing: .06em; padding-top: 3px;
+  }
+  .phase p { margin: 0; font-size: .92rem; color: var(--text-mid); }
+  .phase h3 { margin-bottom: 5px; }
+  .ship { font-family: ui-monospace, monospace; font-size: .7rem; color: var(--text-dim); display: block; margin-top: 7px; }
+
+  /* ============ CARD GRID ============ */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(228px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 17px 18px; }
+  .card h3 { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: .95rem; }
+  .card p { font-size: .88rem; color: var(--text-mid); margin: 0; }
+
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 15px 17px; overflow-x: auto; font-size: .8rem; line-height: 1.6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin: 0 0 22px; color: var(--text-mid);
+  }
+  pre code { background: none; border: 0; padding: 0; white-space: pre; font-size: inherit; }
+  .cm { color: var(--text-dim); }
+  .kw { color: var(--amber); }
+
+  ul.tight { padding-left: 20px; margin: 0 0 20px; }
+  ul.tight li { margin-bottom: 8px; color: var(--text-mid); }
+  ul.tight li strong { color: var(--text); }
+
+  footer { margin-top: 76px; padding-top: 26px; border-top: 1px solid var(--line-soft); color: var(--text-dim); font-size: .85rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .plate.on .img { animation: none; }
+    * { transition-duration: .01ms !important; }
+  }
+  @media (max-width: 640px) {
+    body { padding: 0 18px 80px; font-size: 16px; }
+    .phase { grid-template-columns: 1fr; gap: 6px; }
+  }
+</style>
+
+<header class="wrap">
+  <div class="brandmark">WanderCalm</div>
+  <h1>Frame</h1>
+  <p class="lede">An ambient photo display that wakes and sleeps on your schedule, pulls at random from your starred photographs, and tells you where — or when — each one was taken.</p>
+</header>
+
+<div class="wide stage">
+  <div class="bezel">
+    <div class="screen" id="screen">
+      <div class="plate" id="plateA"><div class="img"></div></div>
+      <div class="plate" id="plateB"><div class="img"></div></div>
+      <div class="grain"></div>
+      <div class="scrim-tl"></div>
+      <div class="scrim-bl"></div>
+
+      <div class="hud-clock">
+        <div class="segs" id="segs"></div>
+        <div class="hud-date" id="hudDate"></div>
+      </div>
+
+      <div class="hud-caption" id="cap">
+        <div class="cap-main" id="capMain"></div>
+        <div class="cap-sub" id="capSub"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnNext">Next photograph</button>
+    <button class="btn" id="btnNight" aria-pressed="false">Simulate 11:40 PM</button>
+    <button class="btn" id="btnTrip" aria-pressed="false">WanderCalm trip captions</button>
+  </div>
+  <p class="caption-note">Live prototype — the clock is real, the transitions and caption logic are the proposed behavior. The imagery is procedurally generated stand-in artwork, not photographs.</p>
+</div>
+
+<div class="wrap">
+
+<section>
+  <p class="eyebrow">The constraint that shapes everything</p>
+  <h2>Google closed the door you were planning to walk through</h2>
+  <p>Before any architecture, one fact has to land, because it invalidates the obvious build. On <strong>March 31, 2025</strong> Google removed the <code>photoslibrary.readonly</code> scope. Enumerating a user's library — including the favorites filter that made "all my starred photos" a two-line query — now returns <code>403 PERMISSION_DENIED</code>. The Library API only sees media your own app uploaded.</p>
+
+  <p>The replacement, the <strong>Picker API</strong>, is a fundamentally different shape: the user hand-picks in a Google-hosted dialog and your app receives only that selection. Three properties make it unusable as a screensaver's live source:</p>
+
+  <ul class="tight">
+    <li><strong>Selections expire after 7 days.</strong> An unattended frame would go blank every week until someone re-picked.</li>
+    <li><strong>Image URLs expire after ~60 minutes</strong> and must carry an OAuth bearer token. Google explicitly says not to store them.</li>
+    <li><strong>GPS is stripped by design.</strong> Location was removed from picker responses as a deliberate privacy measure — so your "show the location" requirement cannot be met this way at all.</li>
+  </ul>
+
+  <div class="callout warn">
+    <p><strong>There is a purpose-built API for exactly this product — and you can't have it yet.</strong> The <strong>Google Photos Ambient API</strong> exists for slideshows on TVs and photo frames, with OAuth for limited-input devices. Access requires acceptance into Google's partner program. Apply in week one, because approval is slow and it is the endgame; but do not put it on the critical path.</p>
+  </div>
+
+  <h3>Where the data you actually need still lives</h3>
+  <p>Google Takeout's per-photo JSON sidecars carry <code>favorited: true</code>, <code>geoData.latitude/longitude</code>, and <code>photoTakenTime</code> — the exact three fields every live API now withholds. That is not a workaround; for this product it is the only complete source.</p>
+
+  <div class="tscroll">
+    <table>
+      <thead>
+        <tr><th>Ingest path</th><th>Starred flag</th><th>GPS</th><th>Unattended</th><th>User effort</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Takeout import</strong></td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td>High — one big export</td></tr>
+        <tr><td><strong>Picker API</strong></td><td class="no">No</td><td class="no">No</td><td class="no">7-day expiry</td><td>Low — but recurring</td></tr>
+        <tr><td><strong>Direct upload</strong></td><td class="no">n/a</td><td class="yes">Yes (EXIF intact)</td><td class="yes">Yes</td><td>Low</td></tr>
+        <tr><td><strong>Ambient API</strong></td><td class="yes">Yes</td><td>Unconfirmed</td><td class="yes">Yes</td><td>Low — gated</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The resolution is to <strong>tier the paths by who's using them</strong>. You do a Takeout import once and get the full starred archive with locations. Guests you share the app with get drag-and-drop upload and the Picker, which need no export and still carry EXIF GPS on direct upload. Everyone lands in the same store.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Architecture</p>
+  <h2>Own the pixels</h2>
+  <p>The single most important decision follows directly from the expiry problem: <strong>never stream from Google at display time.</strong> Copy bytes into your own storage at ingest, extract metadata once, and serve the screensaver entirely from your own infrastructure. The frame then keeps working if Google changes policy again — which, on this API's track record, it will.</p>
+
+  <pre><code><span class="cm">// ingest runs once per photo; the display never touches Google</span>
+Takeout .zip  ─┐
+Direct upload ─┼─&gt; <span class="kw">Queue</span> ─&gt; parse EXIF + sidecar JSON
+Picker API    ─┘         ├─&gt; favorited? taken_at? lat/lng?
+                         ├─&gt; reverse geocode ─&gt; "Kyoto, Japan"  <span class="cm">(cached)</span>
+                         ├─&gt; derivatives 1080/1440/2160 AVIF ─&gt; <span class="kw">R2</span>
+                         └─&gt; row ─&gt; <span class="kw">D1</span>
+
+Display ─&gt; GET /api/deck ─&gt; signed R2 URLs + captions  <span class="cm">(no Google in path)</span></code></pre>
+
+  <p>Cloudflare is the right stack here and you already have the muscle memory from BugDrop: Workers and Hono for the API, <strong>R2 for images</strong> (zero egress fees, which matters enormously when a frame pulls a photo every 30 seconds all day), <strong>D1</strong> for metadata, <strong>Queues</strong> for the ingest pipeline so a 40 GB Takeout upload doesn't block a request, and <strong>Cron Triggers</strong> for the nightly reshuffle.</p>
+
+  <h3>Randomness that actually feels random</h3>
+  <p><code>ORDER BY RANDOM()</code> degrades badly at scale and cheerfully repeats. Use a shuffled deck instead: store an integer <code>shuffle_key</code> per photo, reshuffle nightly via cron, and have each display page through it by cursor. Persist the cursor so a reload doesn't restart the sequence.</p>
+  <p>Then add the detail that separates this from a stock slideshow — <strong>anti-clumping</strong>. Raw shuffle will hand you five frames from the same afternoon in a row, because that's how photos cluster. Enforce a cooldown so no two consecutive photos share a day-bucket, and bias selection to spread across years. The result feels curated rather than dumped.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">The display</p>
+  <h2>What's on screen, and why</h2>
+
+  <div class="cards">
+    <div class="card">
+      <h3>The clock</h3>
+      <p>Seven-segment digits drawn as inline SVG polygons — no webfont to fail, crisp at any size, themeable. Unlit segments stay faintly visible at 8% opacity, the detail that makes a digital clock read as a physical object.</p>
+    </div>
+    <div class="card">
+      <h3>The date, subscripted</h3>
+      <p>Set beneath the time in letterspaced monospace at roughly a fifth the size, so the hierarchy is unambiguous at a glance from across a room.</p>
+    </div>
+    <div class="card">
+      <h3>Caption fallback chain</h3>
+      <p>Place name if GPS resolved, otherwise month and year. Never both, never empty — every photograph gets exactly one line.</p>
+    </div>
+    <div class="card">
+      <h3>Legibility on anything</h3>
+      <p>A photograph can be white sky exactly where your clock sits. Soft corner gradient scrims plus text-shadow guarantee contrast without a visible box.</p>
+    </div>
+  </div>
+
+  <h3>Details worth building in from the start</h3>
+  <ul class="tight">
+    <li><strong>Screen Wake Lock API</strong> to stop the device sleeping mid-slideshow. Requires HTTPS and a user gesture, and must be re-acquired on <code>visibilitychange</code> — it silently drops when the tab backgrounds.</li>
+    <li><strong>Burn-in drift.</strong> Migrate the clock a few pixels over several minutes. On an OLED tablet left running for months, a fixed clock will ghost permanently.</li>
+    <li><strong>Night mode instead of off.</strong> At "off" hours, don't blank — fade the photograph out and hold a dimmed clock. It turns an idle tablet into a bedside clock, which is the feature people will actually keep it plugged in for. Try it in the prototype above.</li>
+    <li><strong>Schedule by wall-clock polling, not <code>setTimeout</code>.</strong> Compare local time every 30 seconds. A timer set 9 hours out will not survive DST, device sleep, or browser throttling.</li>
+    <li><strong>Sunrise/sunset schedules</strong> from the display's latitude, as an alternative to fixed hours — "on at dawn, off at midnight" suits a photo frame better than 07:00.</li>
+    <li><strong>Ken Burns, gently.</strong> A 1.04→1.13 scale drift over the dwell and a 2.5-second crossfade. Honor <code>prefers-reduced-motion</code>.</li>
+  </ul>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Sharing</p>
+  <h2>Displays, not accounts</h2>
+  <p>Your sharing requirement has one significant UX trap in it: the devices best suited to being a photo frame — an old iPad, a Fire tablet, a TV browser — are the worst devices for typing an email and password. Solve it with <strong>pairing codes</strong>. The display opens the URL and shows a six-character code; you enter that code on your phone and bind the display to a photo set and schedule. The frame never sees a keyboard.</p>
+
+  <p>Model a <strong>display</strong> as its own object — slug, schedule, photo set, orientation — separate from the account. One person can run several: kitchen, bedside, parents' house.</p>
+
+  <div class="callout">
+    <p><strong>The idea that makes this spread:</strong> shared walls. A display whose photo set accepts contributions from more than one person. Everyone on a trip drops their favorites into one wall, and each household runs the same frame. That is a genuine reason for a guest to create an account, and it is the natural growth loop for a travel brand — the frame is a souvenir that keeps updating.</p>
+  </div>
+
+  <p>Guard the privacy edge deliberately: a shared link exposing exact coordinates of photographs taken at someone's home is a real harm. <strong>Store precise coordinates, but never return them from the API</strong> — resolve to a place name at ingest and serve only that. Offer per-photo-set granularity: city, country, or nothing.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Brand fit</p>
+  <h2>Why this belongs to WanderCalm</h2>
+  <p>Your trip records carry <code>title</code>, <code>start_date</code>, <code>end_date</code>, <code>route</code>, and <code>home_iana_tz</code>. A photo's <code>taken_at</code> falling inside a trip's date range is a clean join with no extra input — and it upgrades the caption from a place to a memory:</p>
+
+  <pre><code><span class="cm">// caption resolution, in priority order</span>
+"Amalfi Coast, Italy · Day 4 of Italy 2026"   <span class="cm">← trip matched by date range</span>
+"Amalfi Coast, Italy"                          <span class="cm">← GPS resolved, no trip</span>
+"July 2026"                                    <span class="cm">← neither; graceful floor</span></code></pre>
+
+  <p>Toggle <em>WanderCalm trip captions</em> on the prototype to see the difference. From that join, three features come nearly free: an <strong>auto-generated trip wall</strong> published when a trip ends and shared with everyone who travelled; a <strong>"two years ago today"</strong> mode; and trip-filtered sets — a frame showing only Italy.</p>
+  <p>The tonal fit is the stronger argument. A screensaver is ambient by definition: slow, quiet, no notifications, nothing to tap. It's the most on-brand surface a company called WanderCalm could ship, and it keeps the brand present in someone's kitchen every day between trips — which is the hard problem for any travel product.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Sequencing</p>
+  <h2>Build it fast, in this order</h2>
+  <p>The ordering principle: the visible 80% of this product has nothing to do with Google. Build the entire display against a local folder first, so you have something real on a tablet within a day, and confront the ingest mess only once the thing is worth feeding.</p>
+
+  <div class="phases">
+    <div class="phase">
+      <span class="n">01</span>
+      <div>
+        <h3>Walking skeleton</h3>
+        <p>Static folder of photos plus a hand-written JSON manifest. Full display: clock, schedule, night mode, crossfade, captions, wake lock. No auth, no database, no Google.</p>
+        <span class="ship">Ships: a working frame on a real tablet, day one</span>
+      </div>
+    </div>
+    <div class="phase">
+      <span class="n">02</span>
+      <div>
+        <h3>Ingest and store</h3>
+        <p>Upload endpoint, Queue consumer, EXIF extraction, reverse geocoding with a cache, AVIF derivatives to R2, metadata in D1. Now the manifest is generated.</p>
+        <span class="ship">Ships: your own photos, with real locations</span>
+      </div>
+    </div>
+    <div class="phase">
+      <span class="n">03</span>
+      <div>
+        <h3>Takeout importer</h3>
+        <p>Parse the export, read sidecar JSON, filter <code>favorited: true</code>, backfill GPS. This is the step that finally delivers "all my starred photos" as originally asked.</p>
+        <span class="ship">Ships: the actual product you described</span>
+      </div>
+    </div>
+    <div class="phase">
+      <span class="n">04</span>
+      <div>
+        <h3>Accounts, displays, pairing</h3>
+        <p>Magic-link auth, display objects, pairing codes, per-display schedules and photo sets, shareable slugs.</p>
+        <span class="ship">Ships: shareable with other people</span>
+      </div>
+    </div>
+    <div class="phase">
+      <span class="n">05</span>
+      <div>
+        <h3>Trips and walls</h3>
+        <p>WanderCalm trip join, shared walls with multi-person contribution, auto-published trip walls.</p>
+        <span class="ship">Ships: the growth loop</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Decisions to make before you start</h3>
+  <ul class="tight">
+    <li><strong>Reverse geocoding provider.</strong> Nominatim is free but rate-limited and requires attribution; Mapbox is cheap and fast. Either way, geocode once at ingest and cache by coordinates rounded to ~3 decimals — never at display time.</li>
+    <li><strong>Do you keep originals?</strong> Storing only derivatives is far cheaper; keeping originals makes you a backup people trust. This changes your storage bill by an order of magnitude, so decide now.</li>
+    <li><strong>Takeout upload ceiling.</strong> Exports run to tens of gigabytes and arrive as multi-part zips. Multipart upload straight to R2 with a resumable client, or a small local CLI that walks the extracted folder and uploads only favorites — the CLI is dramatically less infrastructure, and it's your own archive, so a terminal command is an acceptable ask.</li>
+    <li><strong>Video.</strong> Excluding it in v1 removes transcoding entirely. Recommended.</li>
+  </ul>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Honest risks</p>
+  <h2>What could undermine this</h2>
+  <ul class="tight">
+    <li><strong>Google narrows access further.</strong> The 2025 removal was abrupt and broke many apps. Owning your copies is the entire mitigation, and it's why the architecture above puts Google strictly at the edge.</li>
+    <li><strong>Ambient API partner acceptance may not come.</strong> Treat it as upside, never as a dependency. Everything above works without it.</li>
+    <li><strong>Takeout is a heavy first-run.</strong> It's the honest cost of the feature you asked for, and it's one-time — but it is the single biggest threat to guest adoption, which is exactly why guests get upload and Picker instead.</li>
+    <li><strong>Long-running browser tabs are unreliable.</strong> Tabs get throttled, memory-killed, and reloaded. Build a heartbeat and self-reload, keep display state server-side so a reload is invisible, and test on the specific hardware you intend to leave running for a month.</li>
+    <li><strong>Terms of service.</strong> Caching a user's own photos with their explicit consent is ordinary, but Google's Photos API policy has specific language on retention. Read it before launching this publicly rather than after.</li>
+  </ul>
+</section>
+
+<footer class="wrap">
+  Design brief for Frame — an ambient photo display for WanderCalm. API constraints verified against Google Photos developer documentation, August 2026.
+</footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- seven-segment clock ---------- */
+  var MAP = {
+    "0":"abcdef", "1":"bc", "2":"abged", "3":"abgcd", "4":"fgbc",
+    "5":"afgcd", "6":"afgecd", "7":"abc", "8":"abcdefg", "9":"afgbcd"
+  };
+  // mitred polygon geometry for a 24 x 44 digit cell
+  function hbar(y) { return "4,"+y+" 6,"+(y-2)+" 18,"+(y-2)+" 20,"+y+" 18,"+(y+2)+" 6,"+(y+2); }
+  function vbar(x, y1, y2) { return x+","+y1+" "+(x+2)+","+(y1+2)+" "+(x+2)+","+(y2-2)+" "+x+","+y2+" "+(x-2)+","+(y2-2)+" "+(x-2)+","+(y1+2); }
+  var GEO = {
+    a: hbar(4), g: hbar(22), d: hbar(40),
+    f: vbar(4, 6, 20),  b: vbar(20, 6, 20),
+    e: vbar(4, 24, 38), c: vbar(20, 24, 38)
+  };
+
+  function digitSVG() {
+    var ns = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 44");
+    svg.setAttribute("aria-hidden", "true");
+    var polys = {};
+    Object.keys(GEO).forEach(function (k) {
+      var p = document.createElementNS(ns, "polygon");
+      p.setAttribute("points", GEO[k]);
+      p.setAttribute("class", "seg-off");
+      svg.appendChild(p);
+      polys[k] = p;
+    });
+    return { el: svg, polys: polys };
+  }
+
+  var segsHost = document.getElementById("segs");
+  var digits = [];
+  function buildClock() {
+    for (var i = 0; i < 4; i++) {
+      if (i === 2) {
+        var c = document.createElement("div");
+        c.className = "colon";
+        c.innerHTML = "<i></i><i></i>";
+        segsHost.appendChild(c);
+        digits.colonEl = c;
+      }
+      var d = digitSVG();
+      segsHost.appendChild(d.el);
+      digits.push(d);
+    }
+    var m = document.createElement("div");
+    m.className = "meridiem";
+    segsHost.appendChild(m);
+    digits.meridiemEl = m;
+  }
+
+  function setDigit(idx, ch) {
+    var on = MAP[ch] || "";
+    var polys = digits[idx].polys;
+    Object.keys(polys).forEach(function (k) {
+      polys[k].setAttribute("class", on.indexOf(k) > -1 ? "seg-on" : "seg-off");
+    });
+  }
+
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  var nightSim = false;
+
+  function renderClock() {
+    var now = new Date();
+    if (nightSim) { now = new Date(now.getTime()); now.setHours(23, 40, now.getSeconds(), 0); }
+
+    var h24 = now.getHours();
+    var h = h24 % 12; if (h === 0) h = 12;
+    var mm = now.getMinutes();
+    var hs = h < 10 ? " " + h : String(h);          // leading blank, as a real clock does
+    var ms = mm < 10 ? "0" + mm : String(mm);
+
+    setDigit(0, hs.charAt(0)); setDigit(1, hs.charAt(1));
+    setDigit(2, ms.charAt(0)); setDigit(3, ms.charAt(1));
+
+    digits.colonEl.classList.toggle("dim", now.getSeconds() % 2 === 1);
+    digits.meridiemEl.textContent = h24 < 12 ? "AM" : "PM";
+
+    document.getElementById("hudDate").textContent =
+      DAYS[now.getDay()] + " " + MONTHS[now.getMonth()] + " " + now.getDate() + ", " + now.getFullYear();
+  }
+
+  buildClock();
+  renderClock();
+  setInterval(renderClock, 500);
+
+  /* ---------- photo deck (procedural stand-in artwork) ---------- */
+  var DECK = [
+    { art: "radial-gradient(120% 90% at 22% 12%, #FFD9A0 0%, rgba(255,217,160,0) 55%), linear-gradient(178deg, #F0A868 0%, #C2643F 34%, #6B3550 63%, #241C33 100%)",
+      place: "Kyoto, Japan", sub: "November 2024", trip: null },
+    { art: "radial-gradient(90% 70% at 70% 25%, #DCE9EC 0%, rgba(220,233,236,0) 60%), linear-gradient(170deg, #B7C9CB 0%, #7F999B 40%, #47585F 72%, #22292F 100%)",
+      place: null, sub: "March 2021", trip: null },
+    { art: "radial-gradient(100% 80% at 15% 80%, #F5C98A 0%, rgba(245,201,138,0) 50%), linear-gradient(200deg, #2E4B63 0%, #3F6B7E 38%, #86A98F 70%, #E4CE9C 100%)",
+      place: "Lofoten, Norway", sub: "June 2023", trip: null },
+    { art: "radial-gradient(110% 85% at 80% 18%, #FFE3B0 0%, rgba(255,227,176,0) 52%), linear-gradient(185deg, #E29A5A 0%, #C4613C 40%, #8A3A34 74%, #3B1D26 100%)",
+      place: "Marrakech, Morocco", sub: "October 2022", trip: null },
+    { art: "radial-gradient(95% 75% at 35% 30%, #CFE3F0 0%, rgba(207,227,240,0) 58%), linear-gradient(175deg, #6E93AE 0%, #4A6E8C 42%, #2C4155 75%, #161E29 100%)",
+      place: null, sub: "January 2020", trip: null },
+    { art: "radial-gradient(105% 80% at 60% 75%, #FFD08A 0%, rgba(255,208,138,0) 55%), linear-gradient(190deg, #4E7FA5 0%, #6FA3B8 30%, #D9A77A 68%, #8C5340 100%)",
+      place: "Amalfi Coast, Italy", sub: "August 2026", trip: "Day 4 of Italy 2026" }
+  ];
+
+  var plates = [document.getElementById("plateA"), document.getElementById("plateB")];
+  var capEl = document.getElementById("cap");
+  var capMain = document.getElementById("capMain");
+  var capSub = document.getElementById("capSub");
+  var screenEl = document.getElementById("screen");
+
+  var order = [], cursor = 0, active = 0, timer = null, tripMode = false;
+
+  function reshuffle() {
+    order = DECK.map(function (_, i) { return i; });
+    for (var i = order.length - 1; i > 0; i--) {          // Fisher-Yates
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = order[i]; order[i] = order[j]; order[j] = t;
+    }
+    cursor = 0;
+  }
+
+  function caption(p) {
+    // fallback chain: trip > place > month & year — exactly one line, never empty
+    if (tripMode && p.trip) { capMain.textContent = p.place || p.sub; capSub.textContent = p.trip; return; }
+    if (p.place) { capMain.textContent = p.place; capSub.textContent = p.sub; return; }
+    capMain.textContent = p.sub;   // no location: the date stands alone, never an error string
+    capSub.textContent = "";
+  }
+
+  function show() {
+    if (cursor >= order.length) reshuffle();
+    var photo = DECK[order[cursor++]];
+    var next = 1 - active;
+
+    plates[next].querySelector(".img").style.backgroundImage = photo.art;
+    plates[next].classList.add("on");
+    plates[active].classList.remove("on");
+    active = next;
+
+    capEl.classList.add("hide");
+    setTimeout(function () { caption(photo); capEl.classList.remove("hide"); }, 700);
+  }
+
+  function schedule() {
+    clearInterval(timer);
+    timer = setInterval(show, 7000);
+  }
+
+  reshuffle();
+  plates[0].style.transition = "opacity 2.2s ease";
+  plates[1].style.transition = "opacity 2.2s ease";
+  show();
+  schedule();
+
+  document.getElementById("btnNext").addEventListener("click", function () { show(); schedule(); });
+
+  document.getElementById("btnNight").addEventListener("click", function () {
+    nightSim = !nightSim;
+    this.setAttribute("aria-pressed", String(nightSim));
+    this.textContent = nightSim ? "Back to daytime" : "Simulate 11:40 PM";
+    screenEl.classList.toggle("night", nightSim);
+    renderClock();
+  });
+
+  document.getElementById("btnTrip").addEventListener("click", function () {
+    tripMode = !tripMode;
+    this.setAttribute("aria-pressed", String(tripMode));
+    // jump to the photograph that carries a trip match so the difference is visible
+    var idx = DECK.findIndex(function (p) { return p.trip; });
+    order.splice(cursor, 0, idx);
+    show(); schedule();
+  });
+})();
+</script>
