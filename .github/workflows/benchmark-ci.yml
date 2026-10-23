@@ -14,9 +14,11 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: '22.23.4'
           cache: 'npm'
 
+      - name: Record Node runtime
+        run: node --version && npm --version
       - name: Install dependencies
         run: npm ci
 
